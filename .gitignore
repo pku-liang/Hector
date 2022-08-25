@@ -2,13 +2,13 @@
 # Created by https://www.toptal.com/developers/gitignore/api/c,c++,clion,macos,cmake
 # Edit at https://www.toptal.com/developers/gitignore?templates=c,c++,clion,macos,cmake
 
-examples/kernels/mid/*
-examples/kernels/chisel/*
-examples/kernels/chisel_dyn/*
-examples/kernels/hector-raw/*
-examples/kernels/hector-split/*
-examples/kernels/hec/*
-examples/kernels/hec_dyn/*
+examples/mid/*
+examples/chisel/*
+examples/chisel_dyn/*
+examples/tor-raw/*
+examples/tor-split/*
+examples/hec/*
+examples/hec_dyn/*
 .metals/*
 .cache/*
 

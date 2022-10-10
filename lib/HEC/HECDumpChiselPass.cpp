@@ -839,9 +839,11 @@ namespace mlir {
             }
             if (!function) {
                 chisel_stage += "\twhen (done) {\n"
-                                "\t\tshift_register := 0.U\n"
-                                "\t\tcounter := 0.U\n"
-                                "\t}\n";
+                                "\t\tshift_register := 0.U\n";
+                if (II != 1) {
+                    chisel_stage += "\t\tcounter := 0.U\n";
+                }
+                chisel_stage += "\t}\n";
             }
 
 

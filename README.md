@@ -7,6 +7,10 @@ This project proposes Hector, a two-level IR providing a unified intermediate re
 
 ## Installation
 1. Install LLVM/MLIR according to https://mlir.llvm.org/getting_started/
+We use the commit 1c10201d9660c1d6f43a7226ca7381bfa255105d
+```sh
+git checkout 1c10201d9660c1d6f43a7226ca7381bfa255105d
+```
 
 2. Clone the project
 ```git clone https://github.com/pku-liang/Hector.git```
@@ -39,6 +43,6 @@ bin/hector-opt ../examples/hybrid-tuned/aeloss_pull.mlir --scf-to-tor --schedule
 
 ## Transformation passes
 ```sh
-build\bin\hector-opt -help
+build/bin/hector-opt -help
 ```
 

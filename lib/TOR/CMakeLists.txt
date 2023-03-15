@@ -7,6 +7,7 @@ add_mlir_dialect_library(MLIRTOR
     TORSplitPass.cpp
     TORCheckPass.cpp
     SCFToTOR.cpp
+    SCFDump.cpp
     WidthAnalysisPass.cpp
     
     ADDITIONAL_HEADER_DIRS

@@ -12,6 +12,7 @@ namespace mlir
   std::unique_ptr<OperationPass<mlir::ModuleOp>> createTORSplitPass();
   std::unique_ptr<OperationPass<mlir::ModuleOp>> createTORCheckPass();
   std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createSCFToTORPass();
+  std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createSCFDumpPass();
   std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createWidthAnalysisPass();
 #define GEN_PASS_REGISTRATION
 #include "TOR/Passes.h.inc"

@@ -24,14 +24,14 @@
 #include <fstream>
 #include "nlohmann/json.hpp"
 
-#define DEBUG_TYPE "dump-scf"
+#define DEBUG_TYPE "dump-tor"
 
 
 namespace {
     using namespace mlir;
     using std::string;
     using nlohmann::json;
-    namespace dump_scf {
+    namespace dump_tor {
         int attr_num;
 
         string get_opertion_attr() {
@@ -39,9 +39,6 @@ namespace {
         }
 
         string get_type(Type type) {
-            if (type.isIndex()) {
-                return "i32";
-            }
             std::string typeStr;
             llvm::raw_string_ostream stro(typeStr);
             type.print(stro);
@@ -56,6 +53,17 @@ namespace {
                 return float_attr.getValue().bitcastToAPInt().toString(10, false);
             } else if (auto bool_attr = attr.dyn_cast<BoolAttr>()) {
                 return std::to_string(bool_attr.getValue());
+            } else {
+                attr.dump();
+                assert(false && "Undefined attribute");
+            }
+        }
+
+        long long get_attr_num(Attribute attr) {
+            if (auto int_attr = attr.dyn_cast<IntegerAttr>()) {
+                return int_attr.getValue().getSExtValue();
+            } else if (auto bool_attr = attr.dyn_cast<BoolAttr>()) {
+                return bool_attr.getValue();
             } else {
                 attr.dump();
                 assert(false && "Undefined attribute");
@@ -86,7 +94,7 @@ namespace {
 
         json get_json(Operation *op);
 
-        json get_json(scf::ForOp forOp) {
+        json get_json(tor::ForOp forOp) {
             json j;
             j["op_type"] = "for";
             j["names"] = json::array();
@@ -109,6 +117,8 @@ namespace {
             for (auto val : forOp.getResults()) {
                 j["names"].push_back(get_value(val));
             }
+            j["start"] = get_attr_num(forOp->getAttr("starttime"));
+            j["end"] = get_attr_num(forOp->getAttr("endtime"));
             return j;
         }
 
@@ -120,17 +130,14 @@ namespace {
         for (auto val : sop.getOperands()) {                              \
             j["operands"].push_back(get_value(val));                      \
         }                                                                 \
+        j["start"] = get_attr_num(sop->getAttr("starttime"));             \
+        j["end"] = get_attr_num(sop->getAttr("endtime"));                 \
         return j;                                                         \
     }
 
         json get_json(Operation *op) {
             json j;
-            if (auto nop = dyn_cast<ConstantOp>(op)) {
-                j["op_type"] = "constant";
-                j["name"] = get_dump(nop);
-                j["operands"] = {get_attr(nop.valueAttr())};
-                j["type"] = get_type(nop.getType());
-            } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+            if (auto forOp = dyn_cast<tor::ForOp>(op)) {
                 j = get_json(forOp);
             } else if (auto loadOp = dyn_cast<tor::LoadOp>(op)) {
                 j["op_type"] = "load";
@@ -139,7 +146,9 @@ namespace {
                 assert(loadOp->getNumResults() == 1);
                 j["index"] = get_value(loadOp.getOperand(1));
                 j["memory"] = get_value(loadOp.memref());
-            } else if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
+                j["start"] = get_attr_num(loadOp->getAttr("starttime"));
+                j["end"] = get_attr_num(loadOp->getAttr("endtime"));
+            } else if (auto yieldOp = dyn_cast<tor::YieldOp>(op)) {
                 j["op_type"] = "yield";
                 j["operands"] = json::array();
                 for (auto val : yieldOp->getOperands()) {
@@ -157,10 +166,12 @@ namespace {
                 j["index"] = get_value(storeOp.indices()[0]);
                 j["memory"] = get_value(storeOp.memref());
                 j["value"] = get_value(storeOp.value());
+                j["start"] = get_attr_num(storeOp->getAttr("starttime"));
+                j["end"] = get_attr_num(storeOp->getAttr("endtime"));
             } else {
                 BINARY_OPERATION(ShiftLeftOp, "shift_left")
-                BINARY_OPERATION(AddIOp, "add")
-                BINARY_OPERATION(MulIOp, "mul")
+                BINARY_OPERATION(tor::AddIOp, "add")
+                BINARY_OPERATION(tor::MulIOp, "mul")
                 op->dump();
                 assert(false);
             }
@@ -177,16 +188,53 @@ namespace {
 
 //            funcOp.getType().getInputs()
             for (auto &op : *(funcOp.getBodyBlock())) {
-                j["body"].push_back(get_json(&op));
+                if (auto graph = dyn_cast<tor::TimeGraphOp>(op)) {
+                    json sj;
+                    sj["start"] = graph.starttime();
+                    sj["end"] = graph.endtime();
+                    sj["edge"] = json::array();
+                    for (auto &sop : *(graph.getBody())) {
+                        if (auto succOp = dyn_cast<tor::SuccTimeOp>(sop)) {
+                            int to = succOp.time();
+                            for (unsigned i = 0; i < succOp.points().size(); ++i) {
+                                auto from = succOp.points()[i];
+                                auto attrs = succOp.edges()[i].dyn_cast<DictionaryAttr>();
+                                json edge;
+                                edge["from"] = get_attr_num(from);
+                                edge["to"] = to;
+                                for (auto attr : attrs) {
+                                    auto edge_attr = attr.second;
+                                    if (auto str_attr = edge_attr.dyn_cast<StringAttr>()) {
+                                        edge[attr.first.strref()] = str_attr.getValue();
+                                    } else {
+                                        edge[attr.first.strref()] = get_attr_num(edge_attr);
+                                    }
+                                }
+                                sj["edge"].push_back(edge);
+                            }
+//                            sj["edge"].push_back(succOp.)
+                        }
+                    }
+                    j["graph"] = sj;
+                } else {
+                    j["body"].push_back(get_json(&op));
+                }
+            }
+
+            if (funcOp->hasAttr("strategy")) {
+                j["strategy"] = string(funcOp->getAttr("strategy").dyn_cast<StringAttr>().getValue());
+            } else {
+                j["strategy"] = "static";
             }
             return j;
         }
 
         json get_json(tor::DesignOp designOp) {
             json j;
-            j["level"] = "software";
+            j["level"] = "tor";
             j["memory"] = json::array();
             j["modules"] = json::array();
+            j["constants"] = json::array();
 
             for (auto &op : *(designOp.getBody())) {
                 if (auto allocOp = dyn_cast<tor::AllocOp>(op)) {
@@ -198,6 +246,12 @@ namespace {
                     j["memory"].push_back(sj);
                 } else if (auto funcOp = dyn_cast<tor::FuncOp>(op)) {
                     j["modules"].push_back(get_json(funcOp));
+                } else if (auto nop = dyn_cast<ConstantOp>(op)) {
+                    json sj;
+                    sj["name"] = get_dump(nop);
+                    sj["operands"] = get_attr(nop.valueAttr());
+                    sj["type"] = get_type(nop.getType());
+                    j["constants"].push_back(sj);
                 } else {
                     op.dump();
                     assert(false);
@@ -206,7 +260,7 @@ namespace {
             return j;
         }
 
-        struct SCFDumpPass : SCFDumpBase<SCFDumpPass> {
+        struct TORDumpPass : TORDumpBase<TORDumpPass> {
             void runOnOperation() override {
                 auto designOp = getOperation();
                 designOp.walk([&](Operation *op) {
@@ -215,8 +269,8 @@ namespace {
 
                 designOp.walk([&](tor::DesignOp op) {
                     auto j = get_json(op);
-                    std::ofstream output_file("scf.json");
-                    output_file << std::setw(2) << j <<std::endl;
+                    std::ofstream output_file("tor.json");
+                    output_file << std::setw(2) << j << std::endl;
                 });
 
             }
@@ -228,8 +282,8 @@ namespace {
 
 namespace mlir {
 
-    std::unique_ptr<OperationPass<tor::DesignOp>> createSCFDumpPass() {
-        return std::make_unique<dump_scf::SCFDumpPass>();
+    std::unique_ptr<OperationPass<tor::DesignOp>> createTORDumpPass() {
+        return std::make_unique<dump_tor::TORDumpPass>();
     }
 
 } // namespace mlir

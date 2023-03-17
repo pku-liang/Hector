@@ -31,7 +31,7 @@
 
 namespace mlir {
     namespace split {
-#define TIME_NODE 105
+#define TIME_NODE 1005
 
         struct TimeEdge {
             int from;

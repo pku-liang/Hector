@@ -2,6 +2,7 @@
 #define HEC_PASS_DETAIL_H
 
 #include "mlir/Pass/Pass.h"
+#include "HEC/HEC.h"
 
 namespace mlir
 {

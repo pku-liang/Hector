@@ -21,4 +21,10 @@ def dynamicSchedule : Pass<"dynamic-schedule", "mlir::ModuleOp"> {
     let dependentDialects = ["mlir::hec::HECDialect", "mlir::tor::TORDialect"];
 }
 
+def HECDump : Pass<"dump-hec", "mlir::hec::DesignOp"> {
+  let summary = "Dump HEC information";
+  let constructor = "mlir::createHECDumpPass()";
+  let dependentDialects = ["mlir::hec::HECDialect"];
+}
+
 #endif // HEC_PASSES

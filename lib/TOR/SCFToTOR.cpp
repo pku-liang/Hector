@@ -518,7 +518,7 @@ namespace {
                         YieldOpConversion, CondOpConversion, WhileOpConversion,
                         ForOpConversion, IfOpConversion, FuncArgCovnersion,
                         CastOpErasure, CmpFOpConversion, ShiftLeftConversionPattern,
-                        MoveConstantUp>(&getContext());
+                        MoveConstantUp, CallOpConversion>(&getContext());
 
                 if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
                     signalPassFailure();

@@ -34,8 +34,8 @@ namespace {
     namespace dump_tor {
         int attr_num;
 
-        string get_opertion_attr() {
-            return "op_" + std::to_string(attr_num++);
+        string get_call_attr() {
+            return "call_" + std::to_string(attr_num++);
         }
 
         string get_type(Type type) {
@@ -53,6 +53,8 @@ namespace {
                 return float_attr.getValue().bitcastToAPInt().toString(10, false);
             } else if (auto bool_attr = attr.dyn_cast<BoolAttr>()) {
                 return std::to_string(bool_attr.getValue());
+            } else if (auto str_attr = attr.dyn_cast<StringAttr>()) {
+                return string(str_attr.getValue());
             } else {
                 attr.dump();
                 assert(false && "Undefined attribute");
@@ -154,12 +156,18 @@ namespace {
                 for (auto val : yieldOp->getOperands()) {
                     j["operands"].push_back(get_value(val));
                 }
+                j["time"] = get_attr_num(yieldOp->getParentOp()->getAttr("endtime"));
+                j["jump"] = get_attr_num(yieldOp->getParentOp()->getAttr("starttime"));
             } else if (auto returnOp = dyn_cast<tor::ReturnOp>(op)) {
                 j["op_type"] = "return";
                 j["operands"] = json::array();
                 for (auto val : returnOp->getOperands()) {
                     j["operands"].push_back(get_value(val));
                 }
+                auto funcOp = dyn_cast<tor::FuncOp>(returnOp->getParentOp());
+                funcOp->walk([&](tor::TimeGraphOp op) {
+                    j["time"] = op.endtime();
+                });
             } else if (auto storeOp = dyn_cast<tor::StoreOp>(op)) {
                 assert(storeOp.getIndices().size() == 1);
                 j["op_type"] = "store";
@@ -168,6 +176,19 @@ namespace {
                 j["value"] = get_value(storeOp.value());
                 j["start"] = get_attr_num(storeOp->getAttr("starttime"));
                 j["end"] = get_attr_num(storeOp->getAttr("endtime"));
+            } else if (auto callOp = dyn_cast<tor::CallOp>(op)) {
+                j["op_type"] = "call";
+                j["start"] = get_attr_num(callOp->getAttr("starttime"));
+                j["end"] = get_attr_num(callOp->getAttr("endtime"));
+                j["names"] = json::array();
+                j["operands"] = json::array();
+                j["function"] = callOp.getCallee();
+                for (auto return_val : callOp.getResults()) {
+                    j["names"].push_back(get_value(return_val));
+                }
+                for (auto arg : callOp.getArgOperands()) {
+                    j["operands"].push_back(get_value(arg));
+                }
             } else {
                 BINARY_OPERATION(ShiftLeftOp, "shift_left")
                 BINARY_OPERATION(tor::AddIOp, "add")
@@ -220,9 +241,18 @@ namespace {
                     j["body"].push_back(get_json(&op));
                 }
             }
+            for (auto val : funcOp.getArguments()) {
+                j["args"].push_back(get_value(val));
+                j["types"].push_back(get_type(val.getType()));
+            }
 
             if (funcOp->hasAttr("strategy")) {
-                j["strategy"] = string(funcOp->getAttr("strategy").dyn_cast<StringAttr>().getValue());
+                if (funcOp->hasAttr("pipeline")) {
+                    j["strategy"] = "pipeline " + get_attr(funcOp->getAttr("pipeline")) + " " + get_attr(funcOp->getAttr("II"));
+                }
+                else {
+                    j["strategy"] = string(funcOp->getAttr("strategy").dyn_cast<StringAttr>().getValue());
+                }
             } else {
                 j["strategy"] = "static";
             }
@@ -263,9 +293,6 @@ namespace {
         struct TORDumpPass : TORDumpBase<TORDumpPass> {
             void runOnOperation() override {
                 auto designOp = getOperation();
-                designOp.walk([&](Operation *op) {
-                    op->setAttr("dump", StringAttr::get(&getContext(), get_opertion_attr().c_str()));
-                });
 
                 designOp.walk([&](tor::DesignOp op) {
                     auto j = get_json(op);

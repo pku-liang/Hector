@@ -22,16 +22,24 @@
 
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 #include <iostream>
 #include <algorithm>
 #include <functional>
 
 #define DEBUG_TYPE "split-schedule"
-
+using std::string;
 namespace mlir {
     namespace split {
 #define TIME_NODE 1005
+        int attr_num=0;
+        string get_new_attr() {
+            return "new_" + std::to_string(attr_num++);
+        }
+        string get_call_attr() {
+            return "call_" + std::to_string(attr_num++);
+        }
 
         struct TimeEdge {
             int from;
@@ -440,6 +448,7 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                     static int func_num = 0;
                     std::string func_name = "outline_" + std::to_string(func_num++);
                     auto out_func = rewriter.create<tor::FuncOp>(funcOp.getLoc(), func_name, func_type);
+                    out_func->setAttr("dump", StringAttr::get(getContext(), get_new_attr().c_str()));
                     out_func->setAttr("strategy", StringAttr::get(getContext(), "static"));
                     rewriter.createBlock(&(out_func.getBody()), {}, argTypes);
 
@@ -488,8 +497,7 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                     rewriter.setInsertionPointAfter(lastOp);
                     auto callOp = rewriter.create<tor::CallOp>(lastOp->getLoc(), retTypes, func_name, start, end,
                                                                 ValueRange(argValues));
-
-                    std::cerr << "------NEW CALL-------" << std::endl;
+                    callOp->setAttr("dump", StringAttr::get(getContext(), get_call_attr().c_str()));                    std::cerr << "------NEW CALL-------" << std::endl;
 
                     rewriter.setInsertionPointToEnd(out_func.getBodyBlock());
                     visitOperation(start, [&](Operation *op) {

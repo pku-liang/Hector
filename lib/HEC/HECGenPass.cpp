@@ -845,7 +845,8 @@ namespace mlir {
 
                 component = rewriter.create<mlir::hec::ComponentOp>(design.getLoc(), name,
                                                                     ports, interfc, style);
-                component->setAttr("dump", design->getAttr("dump"));
+                design.dump();
+                component->setAttr("dump", func->getAttr("dump"));
 
                 switch (this->style) {
                     case Style::NORMAL:

@@ -199,11 +199,15 @@ namespace {
             return j;
         }
 
+#undef BINARY_OPERATION
+
         json get_json(tor::FuncOp funcOp) {
             json j;
             j["name"] = funcOp.getName();
             j["args"] = json::array();
             j["types"] = json::array();
+            j["return_vals"] = json::array();
+            j["ret_types"] = json::array();
             j["body"] = json::array();
             //TODO: types & args
 
@@ -245,12 +249,16 @@ namespace {
                 j["args"].push_back(get_value(val));
                 j["types"].push_back(get_type(val.getType()));
             }
+            for (auto val : funcOp->getResults()) {
+                j["return_vals"].push_back(get_value(val));
+                j["ret_types"].push_back(get_type(val.getType()));
+            }
 
             if (funcOp->hasAttr("strategy")) {
                 if (funcOp->hasAttr("pipeline")) {
-                    j["strategy"] = "pipeline " + get_attr(funcOp->getAttr("pipeline")) + " " + get_attr(funcOp->getAttr("II"));
-                }
-                else {
+                    j["strategy"] =
+                            "pipeline " + get_attr(funcOp->getAttr("pipeline")) + " " + get_attr(funcOp->getAttr("II"));
+                } else {
                     j["strategy"] = string(funcOp->getAttr("strategy").dyn_cast<StringAttr>().getValue());
                 }
             } else {
@@ -304,7 +312,6 @@ namespace {
 
         };
     }
-
 } // namespace
 
 namespace mlir {

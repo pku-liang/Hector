@@ -192,16 +192,10 @@ namespace {
                                 sj["default"] = jump.dest();
                             }
                         } else if (auto done = dyn_cast<hec::DoneOp>(sop)) {
-                            sj["done"]["return"] = json::array();
-                            sj["done"]["args"] = json::array();
+                            sj["done"] = json::array();
                             sj.erase("jump");
                             for (auto val : done->getResults()) {
-                                sj["done"]["returns"].push_back(get_value(val));
-                            }
-                            auto component = dyn_cast<hec::ComponentOp>(state->getParentOp()->getParentOp());
-                            auto in_num = component.numInPorts();
-                            for (unsigned idx = in_num; idx < component.getNumArguments(); ++idx) {
-                                sj["done"]["args"].push_back(get_value(component.getArgument(idx)));
+                                sj["done"].push_back(get_value(val));
                             }
                         }
                     }
@@ -269,6 +263,7 @@ namespace {
             j["ret_types"] = json::array();
             j["units"] = json::array();
             j["instances"] = json::array();
+            j["num_in"] = component.numInPorts();
 
             auto style = get_attr(component->getAttr("style"));
             j["style"] = style;

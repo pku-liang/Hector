@@ -96,10 +96,13 @@ namespace {
                 }
             } else if (auto arg = val.dyn_cast<BlockArgument>()) {
                 auto block = arg.getOwner();
-                if (block->getNumArguments() == 1) {
-                    return get_dump(block->getParentOp());
+                auto op = block->getParentOp();
+                if (auto component = dyn_cast<hec::ComponentOp>(op)) {
+                    return get_attr(component.portNames()[arg.getArgNumber()]);
                 } else {
-                    return get_dump(block->getParentOp()) + "_" + std::to_string(arg.getArgNumber());
+                    op->dump();
+                    assert(false);
+                    return "";
                 }
             } else {
                 assert(false);
@@ -146,11 +149,17 @@ namespace {
                 return j;
             } else if (auto assign = dyn_cast<hec::AssignOp>(op)) {
                 json j;
+                j["op_type"] = "assign";
                 j["src"] = get_value(assign.src());
                 j["dst"] = get_value(assign.dest());
                 if (assign.guard()) {
                     j["condition"] = get_value(assign.guard());
                 }
+                return j;
+            } else if (auto enable = dyn_cast<hec::EnableOp>(op)) {
+                json j;
+                j["op_type"] = "enable";
+                j["port"] = get_value(enable.port());
                 return j;
             } else {
                 OPERATION(hec::AddIOp, "add")
@@ -168,8 +177,6 @@ namespace {
             json j;
             j["state"] = state.getName();
             j["ops"] = json::array();
-            j["assigns"] = json::array();
-            j["enables"] = json::array();
             for (auto &op : *state.getBody()) {
                 if (auto transition = dyn_cast<hec::TransitionOp>(op)) {
                     json sj;
@@ -185,20 +192,22 @@ namespace {
                                 sj["default"] = jump.dest();
                             }
                         } else if (auto done = dyn_cast<hec::DoneOp>(sop)) {
-                            sj["done"] = json::array();
+                            sj["done"]["return"] = json::array();
+                            sj["done"]["args"] = json::array();
                             sj.erase("jump");
                             for (auto val : done->getResults()) {
-                                sj["done"].push_back(get_value(val));
+                                sj["done"]["returns"].push_back(get_value(val));
+                            }
+                            auto component = dyn_cast<hec::ComponentOp>(state->getParentOp()->getParentOp());
+                            auto in_num = component.numInPorts();
+                            for (unsigned idx = in_num; idx < component.getNumArguments(); ++idx) {
+                                sj["done"]["args"].push_back(get_value(component.getArgument(idx)));
                             }
                         }
                     }
                     j["transition"] = sj;
-                } else if (auto enable = dyn_cast<hec::EnableOp>(op)) {
-                    j["enables"].push_back(get_value(enable.port()));
-                } else if (isa<hec::AssignOp>(op)) {
-                    j["assigns"].push_back(get_json(&op));
-                } else if (auto enable = dyn_cast<hec::EnableOp>(op)) {
-                    j["enables"].push_back(get_value(enable.port()));
+                } else if (isa<hec::AssignOp, hec::EnableOp>(op)) {
+                    j["ops"].push_back(get_json(&op));
                 } else if (auto go = dyn_cast<hec::GoOp>(op)) {
                     json sj;
                     sj["op_type"] = "go";
@@ -215,8 +224,6 @@ namespace {
             json j;
             j["stage"] = stage.getName();
             j["ops"] = json::array();
-            j["assigns"] = json::array();
-            j["enables"] = json::array();
             for (auto &op : *stage.getBody()) {
                 if (auto transition = dyn_cast<hec::TransitionOp>(op)) {
                     json sj;
@@ -234,21 +241,18 @@ namespace {
                         }
                     }
                     j["transition"] = sj;
-                } else if (auto enable = dyn_cast<hec::EnableOp>(op)) {
-                    j["enables"].push_back(get_value(enable.port()));
-                } else if (isa<hec::AssignOp>(op)) {
-                    j["assigns"].push_back(get_json(&op));
-                } else if (auto enable = dyn_cast<hec::EnableOp>(op)) {
-                    j["enables"].push_back(get_value(enable.port()));
+                } else if (isa<hec::AssignOp, hec::EnableOp>(op)) {
+                    j["ops"].push_back(get_json(&op));
                 } else if (auto deliver = dyn_cast<hec::DeliverOp>(op)) {
                     json sj;
+                    sj["op_type"] = "deliver";
                     sj["src"] = get_value(deliver.src());
                     sj["dst_port"] = get_value(deliver.destPort());
                     sj["dst_reg"] = get_value(deliver.destReg());
                     if (deliver.guard()) {
                         sj["condition"] = get_value(deliver.guard());
                     }
-                    j["delivers"].push_back(sj);
+                    j["ops"].push_back(sj);
                 } else {
                     j["ops"].push_back(get_json(&op));
                 }
@@ -284,6 +288,7 @@ namespace {
                 j["pipeline_style"] = get_attr(component->getAttr("pipeline"));
                 j["stages"] = json::array();
                 j["inits"] = json::array();
+                j["ii"] = get_attr_num(component->getAttr("II"));
             } else if (style == "dynamic") {
                 assert(false);
             }
@@ -324,10 +329,6 @@ namespace {
                     sj["instance_name"] = instance.instanceName();
                     sj["module_name"] = instance.componentName();
                     sj["names"] = json::array();
-                    auto component = instance.getReferencedComponent();
-                    for (auto &port : component.portNames()) {
-                        sj["names"].push_back(get_attr(port));
-                    }
                     j["instances"].push_back(sj);
                 } else {
                     op.dump();

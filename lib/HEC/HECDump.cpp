@@ -165,6 +165,7 @@ namespace {
                 OPERATION(hec::ShiftLeftOp, "shift_left")
                 OPERATION(hec::AddIOp, "add")
                 OPERATION(hec::SubIOp, "sub")
+                OPERATION(hec::NotOp, "not")
                 op->dump();
                 assert(false);
                 return j;

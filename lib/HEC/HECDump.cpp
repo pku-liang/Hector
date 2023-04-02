@@ -383,10 +383,7 @@ namespace {
                     auto j = get_json(op);
                     std::ofstream output_file("hec.json");
                     output_file << std::setw(2) << j << std::endl;
-//                    std::cout << std::setw(2) << j << std::endl;
                 });
-                exit(-1);
-
             }
 
         };

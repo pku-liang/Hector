@@ -58,6 +58,7 @@ namespace {
             } else {
                 attr.dump();
                 assert(false && "Undefined attribute");
+                return "";
             }
         }
 
@@ -69,6 +70,7 @@ namespace {
             } else {
                 attr.dump();
                 assert(false && "Undefined attribute");
+                return 0;
             }
         }
 
@@ -92,6 +94,8 @@ namespace {
                     return get_dump(block->getParentOp()) + "_" + std::to_string(arg.getArgNumber());
                 }
             }
+            assert(false);
+            return "";
         }
 
         json get_json(Operation *op);
@@ -124,7 +128,7 @@ namespace {
             return j;
         }
 
-#define BINARY_OPERATION(TYPE, NAME)  if (auto sop = dyn_cast<TYPE>(op)) {\
+#define OPERATION(TYPE, NAME)  if (auto sop = dyn_cast<TYPE>(op)) {\
         j["op_type"] = NAME;                                              \
         j["name"] = get_value(sop.getResult());                           \
         j["type"] = get_type(sop.getResult().getType());                  \
@@ -190,16 +194,21 @@ namespace {
                     j["operands"].push_back(get_value(arg));
                 }
             } else {
-                BINARY_OPERATION(ShiftLeftOp, "shift_left")
-                BINARY_OPERATION(tor::AddIOp, "add")
-                BINARY_OPERATION(tor::MulIOp, "mul")
+                OPERATION(ShiftLeftOp, "shift_left")
+                OPERATION(tor::AddIOp, "add")
+                OPERATION(tor::MulIOp, "mul")
+                OPERATION(tor::SubIOp, "sub")
+
+                OPERATION(tor::AddFOp, "add")
+                OPERATION(tor::MulFOp, "mul")
+                OPERATION(tor::SubFOp, "sub")
                 op->dump();
                 assert(false);
             }
             return j;
         }
 
-#undef BINARY_OPERATION
+#undef OPERATION
 
         json get_json(tor::FuncOp funcOp) {
             json j;

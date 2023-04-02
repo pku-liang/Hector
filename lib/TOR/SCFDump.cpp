@@ -59,6 +59,7 @@ namespace {
             } else {
                 attr.dump();
                 assert(false && "Undefined attribute");
+                return "";
             }
         }
 
@@ -81,6 +82,9 @@ namespace {
                 } else {
                     return get_dump(block->getParentOp()) + "_" + std::to_string(arg.getArgNumber());
                 }
+            } else {
+                assert(false);
+                return "";
             }
         }
 
@@ -112,12 +116,12 @@ namespace {
             return j;
         }
 
-#define BINARY_OPERATION(TYPE, NAME)  if (auto sop = dyn_cast<TYPE>(op)) {\
+#define OPERATION(TYPE, NAME)  if (auto sop = dyn_cast<TYPE>(op)) {\
         j["op_type"] = NAME;                                              \
         j["name"] = get_value(sop.getResult());                           \
         j["type"] = get_type(sop.getResult().getType());                  \
         j["operands"] = json::array();                                    \
-        for (auto val : sop.getOperands()) {                              \
+        for (auto val : op->getOperands()) {                              \
             j["operands"].push_back(get_value(val));                      \
         }                                                                 \
         return j;                                                         \
@@ -158,9 +162,17 @@ namespace {
                 j["memory"] = get_value(storeOp.memref());
                 j["value"] = get_value(storeOp.value());
             } else {
-                BINARY_OPERATION(ShiftLeftOp, "shift_left")
-                BINARY_OPERATION(AddIOp, "add")
-                BINARY_OPERATION(MulIOp, "mul")
+                OPERATION(ShiftLeftOp, "shift_left")
+                OPERATION(AddIOp, "add")
+                OPERATION(MulIOp, "mul")
+                OPERATION(SubIOp, "sub")
+                OPERATION(SIToFPOp, "sitofp")
+                OPERATION(IndexCastOp, "index_cast")
+
+                OPERATION(AddFOp, "add")
+                OPERATION(MulFOp, "mul")
+                OPERATION(SubFOp, "sub")
+
                 op->dump();
                 assert(false);
             }

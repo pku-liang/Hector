@@ -162,9 +162,9 @@ namespace {
                 j["port"] = get_value(enable.port());
                 return j;
             } else {
-                OPERATION(hec::AddIOp, "add")
-                OPERATION(hec::NotOp, "not")
                 OPERATION(hec::ShiftLeftOp, "shift_left")
+                OPERATION(hec::AddIOp, "add")
+                OPERATION(hec::SubIOp, "sub")
                 op->dump();
                 assert(false);
                 return j;

@@ -128,12 +128,33 @@ namespace {
             return j;
         }
 
+        json get_json(tor::IfOp ifOp) {
+            json j;
+            j["op_type"] = "if";
+            j["names"] = json::array();
+            j["condition"] = get_value(ifOp.condition());
+            j["body0"] = json::array();
+            j["body1"] = json::array();
+            for (auto &op : *(ifOp.getBody())) {
+                j["body0"].push_back(get_json(&op));
+            }
+            for (auto &op : *(ifOp.getBody(1))) {
+                j["body1"].push_back(get_json(&op));
+            }
+            for (auto val : ifOp.getResults()) {
+                j["names"].push_back(get_value(val));
+            }
+            j["start"] = get_attr_num(ifOp->getAttr("starttime"));
+            j["end"] = get_attr_num(ifOp->getAttr("endtime"));
+            return j;
+        }
+
 #define OPERATION(TYPE, NAME)  if (auto sop = dyn_cast<TYPE>(op)) {\
         j["op_type"] = NAME;                                              \
         j["name"] = get_value(sop.getResult());                           \
         j["type"] = get_type(sop.getResult().getType());                  \
         j["operands"] = json::array();                                    \
-        for (auto val : sop.getOperands()) {                              \
+        for (auto val : op->getOperands()) {                              \
             j["operands"].push_back(get_value(val));                      \
         }                                                                 \
         j["start"] = get_attr_num(sop->getAttr("starttime"));             \
@@ -145,6 +166,8 @@ namespace {
             json j;
             if (auto forOp = dyn_cast<tor::ForOp>(op)) {
                 j = get_json(forOp);
+            } else if (auto ifOp = dyn_cast<tor::IfOp>(op)) {
+                j = get_json(ifOp);
             } else if (auto loadOp = dyn_cast<tor::LoadOp>(op)) {
                 j["op_type"] = "load";
                 j["name"] = get_dump(loadOp);
@@ -202,6 +225,7 @@ namespace {
                 OPERATION(tor::AddFOp, "add")
                 OPERATION(tor::MulFOp, "mul")
                 OPERATION(tor::SubFOp, "sub")
+                OPERATION(TruncateIOp, "trunc")
                 op->dump();
                 assert(false);
             }

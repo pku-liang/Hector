@@ -166,6 +166,7 @@ namespace {
                 OPERATION(hec::AddIOp, "add")
                 OPERATION(hec::SubIOp, "sub")
                 OPERATION(hec::NotOp, "not")
+                OPERATION(hec::TruncateIOp, "trunc")
                 op->dump();
                 assert(false);
                 return j;

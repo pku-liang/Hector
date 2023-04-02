@@ -116,6 +116,25 @@ namespace {
             return j;
         }
 
+        json get_json(scf::IfOp ifOp) {
+            json j;
+            j["op_type"] = "if";
+            j["cond"] = get_value(ifOp.condition());
+            j["names"] = json::array();
+            j["body0"] = json::array();
+            j["body1"] = json::array();
+            for (auto val : ifOp.getResults()) {
+                j["names"].push_back(get_value(val));
+            }
+            for (auto &op : *(ifOp.getBody())) {
+                j["body0"].push_back(get_json(&op));
+            }
+            for (auto &op : *(ifOp.getBody(1))) {
+                j["body1"].push_back(get_json(&op));
+            }
+            return j;
+        }
+
 #define OPERATION(TYPE, NAME)  if (auto sop = dyn_cast<TYPE>(op)) {\
         j["op_type"] = NAME;                                              \
         j["name"] = get_value(sop.getResult());                           \
@@ -136,6 +155,8 @@ namespace {
                 j["type"] = get_type(nop.getType());
             } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
                 j = get_json(forOp);
+            } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+                j = get_json(ifOp);
             } else if (auto loadOp = dyn_cast<tor::LoadOp>(op)) {
                 j["op_type"] = "load";
                 j["name"] = get_dump(loadOp);
@@ -172,6 +193,7 @@ namespace {
                 OPERATION(AddFOp, "add")
                 OPERATION(MulFOp, "mul")
                 OPERATION(SubFOp, "sub")
+                OPERATION(TruncateIOp, "trunc")
 
                 op->dump();
                 assert(false);

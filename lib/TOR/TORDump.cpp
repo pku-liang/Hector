@@ -34,8 +34,8 @@ namespace {
     namespace dump_tor {
         int attr_num;
 
-        string get_call_attr() {
-            return "call_" + std::to_string(attr_num++);
+        string get_new_attr() {
+            return "new_constant_" + std::to_string(attr_num++);
         }
 
         string get_type(Type type) {
@@ -310,6 +310,11 @@ namespace {
         struct TORDumpPass : TORDumpBase<TORDumpPass> {
             void runOnOperation() override {
                 auto designOp = getOperation();
+                designOp.walk([&](ConstantOp op) {
+                    if (!op->hasAttr("dump")) {
+                        op->setAttr("dump", StringAttr::get(&getContext(), get_new_attr().c_str()));
+                    }
+                });
 
                 designOp.walk([&](tor::DesignOp op) {
                     auto j = get_json(op);

@@ -348,7 +348,7 @@ namespace mlir {
                         pname);
                 primitive->setAttr("len", rewriter.getI32IntegerAttr(length));
                 primitive->setAttr("ports", rw);
-                primitive->setAttr("dump", alloc->getAttr("dump"));
+//                primitive->setAttr("dump", alloc->getAttr("dump"));
 
                 mem.op = primitive;
                 memories.push_back(mem);
@@ -1409,7 +1409,7 @@ namespace mlir {
                                     cname, pname);
                             primitive->setAttr("len", rewriter.getI32IntegerAttr(length));
                             primitive->setAttr("ports", rw);
-                            primitive->setAttr("dump", alloc->getAttr("dump"));
+//                            primitive->setAttr("dump", alloc->getAttr("dump"));
 
                             mem.op = primitive;
                             memories.push_back(mem);

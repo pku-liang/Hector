@@ -200,7 +200,7 @@ namespace {
                         } else if (auto done = dyn_cast<hec::DoneOp>(sop)) {
                             sj["done"] = json::array();
                             sj.erase("jump");
-                            for (auto val : done->getResults()) {
+                            for (auto val : done->getOperands()) {
                                 sj["done"].push_back(get_value(val));
                             }
                         }

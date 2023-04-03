@@ -39,6 +39,8 @@ namespace {
         }
 
         string get_type(Type type) {
+            if (type.isInteger(1))
+                return "bool";
             std::string typeStr;
             llvm::raw_string_ostream stro(typeStr);
             type.print(stro);

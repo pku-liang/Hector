@@ -39,6 +39,8 @@ namespace {
         }
 
         string get_type(Type type) {
+            if (type.isInteger(1))
+                return "bool";
             if (type.isIndex()) {
                 return "i32";
             }
@@ -119,7 +121,7 @@ namespace {
         json get_json(scf::IfOp ifOp) {
             json j;
             j["op_type"] = "if";
-            j["cond"] = get_value(ifOp.condition());
+            j["condition"] = get_value(ifOp.condition());
             j["names"] = json::array();
             j["body0"] = json::array();
             j["body1"] = json::array();
@@ -250,7 +252,7 @@ namespace {
                 designOp.walk([&](tor::DesignOp op) {
                     auto j = get_json(op);
                     std::ofstream output_file("scf.json");
-                    output_file << std::setw(2) << j <<std::endl;
+                    output_file << std::setw(2) << j << std::endl;
                 });
 
             }

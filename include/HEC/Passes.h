@@ -12,7 +12,7 @@ namespace mlir {
 
     std::unique_ptr<OperationPass<mlir::ModuleOp>> createDynamicSchedulePass();
 
-    std::unique_ptr<OperationPass<hec::DesignOp>> createHECDumpPass();
+    std::unique_ptr<OperationPass<mlir::ModuleOp>> createHECDumpPass();
 
 #define GEN_PASS_REGISTRATION
 

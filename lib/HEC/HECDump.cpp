@@ -39,6 +39,7 @@ namespace {
         }
 
         string get_dump(Operation *op) {
+            op->dump();
             return string(op->getAttr("dump").dyn_cast<StringAttr>().getValue());
         }
 
@@ -378,7 +379,7 @@ namespace {
 
                 designOp.walk([&](Operation *op) {
                     if (isa<hec::ShiftLeftOp, hec::AddIOp, hec::SubIOp, hec::NotOp, hec::XOrOp, hec::AndOp,
-                            hec::OrOp, hec::CmpIOp>(op)) {
+                            hec::OrOp, hec::CmpIOp, hec::TruncateIOp>(op)) {
                         op->setAttr("dump", StringAttr::get(&getContext(), get_comb_attr().c_str()));
                     }
                 });
@@ -397,7 +398,7 @@ namespace {
 
 namespace mlir {
 
-    std::unique_ptr<OperationPass<hec::DesignOp>> createHECDumpPass() {
+    std::unique_ptr<OperationPass<mlir::ModuleOp>> createHECDumpPass() {
         return std::make_unique<dump_hec::HECDumpPass>();
     }
 

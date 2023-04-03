@@ -55,7 +55,8 @@ namespace {
             if (auto int_attr = attr.dyn_cast<IntegerAttr>()) {
                 return std::to_string(int_attr.getValue().getSExtValue());
             } else if (auto float_attr = attr.dyn_cast<FloatAttr>()) {
-                return float_attr.getValue().bitcastToAPInt().toString(10, false);
+                double float_str = float_attr.getValue().convertToDouble();
+                return std::to_string(float_str);
             } else if (auto bool_attr = attr.dyn_cast<BoolAttr>()) {
                 return std::to_string(bool_attr.getValue());
             } else {

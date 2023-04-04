@@ -219,6 +219,7 @@ namespace {
                 OPERATION(AndOp, "and")
                 OPERATION(OrOp, "or")
                 OPERATION(XOrOp, "xor")
+                OPERATION(DivFOp, "div")
 
 
                 op->dump();

@@ -255,6 +255,7 @@ namespace {
                 OPERATION(AndOp, "and")
                 OPERATION(OrOp, "or")
                 OPERATION(XOrOp, "xor")
+                OPERATION(tor::DivFOp, "div")
                 op->dump();
                 assert(false);
             }

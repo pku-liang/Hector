@@ -219,6 +219,28 @@ namespace {
                 for (auto arg : callOp.getArgOperands()) {
                     j["operands"].push_back(get_value(arg));
                 }
+            } else if (auto cmpIOp = dyn_cast<tor::CmpIOp>(op)) {
+                j["operands"] = json::array();
+                j["start"] = get_attr_num(cmpIOp->getAttr("starttime"));
+                j["end"] = get_attr_num(cmpIOp->getAttr("endtime"));
+                j["op_type"] = string("cmp_") + stringifyCmpIPredicate(cmpIOp.predicate()).str();
+                j["name"] = get_dump(cmpIOp);
+                j["type"] = get_type(cmpIOp.getResult().getType());
+                for (const auto &operand : cmpIOp->getOperands()) {
+                    j["operands"].push_back(get_value(operand));
+                }
+                return j;
+            } else if (auto cmpFOp = dyn_cast<tor::CmpFOp>(op)) {
+                j["operands"] = json::array();
+                j["start"] = get_attr_num(cmpFOp->getAttr("starttime"));
+                j["end"] = get_attr_num(cmpFOp->getAttr("endtime"));
+                j["op_type"] = string("cmp_") + stringifyCmpFPredicate(cmpFOp.predicate()).str();
+                j["name"] = get_dump(cmpFOp);
+                j["type"] = get_type(cmpFOp.getResult().getType());
+                for (const auto &operand : cmpFOp->getOperands()) {
+                    j["operands"].push_back(get_value(operand));
+                }
+                return j;
             } else {
                 OPERATION(ShiftLeftOp, "shift_left")
                 OPERATION(tor::AddIOp, "add")

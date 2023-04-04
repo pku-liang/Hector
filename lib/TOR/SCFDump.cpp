@@ -160,6 +160,24 @@ namespace {
                 j = get_json(forOp);
             } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
                 j = get_json(ifOp);
+            } else if (auto cmpIOp = dyn_cast<CmpIOp>(op)) {
+                j["operands"] = json::array();
+                j["op_type"] = string("cmp_") + stringifyCmpIPredicate(cmpIOp.predicate()).str();
+                j["name"] = get_dump(cmpIOp);
+                j["type"] = get_type(cmpIOp.getResult().getType());
+                for (const auto &operand : cmpIOp->getOperands()) {
+                    j["operands"].push_back(get_value(operand));
+                }
+                return j;
+            } else if (auto cmpFOp = dyn_cast<CmpFOp>(op)) {
+                j["operands"] = json::array();
+                j["op_type"] = string("cmp_") + stringifyCmpFPredicate(cmpFOp.predicate()).str();
+                j["name"] = get_dump(cmpFOp);
+                j["type"] = get_type(cmpFOp.getResult().getType());
+                for (const auto &operand : cmpFOp->getOperands()) {
+                    j["operands"].push_back(get_value(operand));
+                }
+                return j;
             } else if (auto loadOp = dyn_cast<tor::LoadOp>(op)) {
                 j["op_type"] = "load";
                 j["name"] = get_dump(loadOp);

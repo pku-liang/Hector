@@ -252,6 +252,9 @@ namespace {
                 OPERATION(tor::SubFOp, "sub")
                 OPERATION(TruncateIOp, "trunc")
                 OPERATION(SelectOp, "select")
+                OPERATION(AndOp, "and")
+                OPERATION(OrOp, "or")
+                OPERATION(XOrOp, "xor")
                 op->dump();
                 assert(false);
             }

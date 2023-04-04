@@ -172,6 +172,9 @@ namespace {
                 OPERATION(hec::NotOp, "not")
                 OPERATION(hec::TruncateIOp, "trunc")
                 OPERATION(hec::SelectOp, "select")
+                OPERATION(hec::AndOp, "and")
+                OPERATION(hec::OrOp, "or")
+                OPERATION(hec::XOrOp, "xor")
                 op->dump();
                 assert(false);
                 return j;

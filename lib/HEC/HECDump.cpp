@@ -383,7 +383,7 @@ namespace {
 
                 designOp.walk([&](Operation *op) {
                     if (isa<hec::ShiftLeftOp, hec::AddIOp, hec::SubIOp, hec::NotOp, hec::XOrOp, hec::AndOp,
-                            hec::OrOp, hec::CmpIOp, hec::TruncateIOp>(op)) {
+                            hec::OrOp, hec::CmpIOp, hec::TruncateIOp, hec::SelectOp>(op)) {
                         op->setAttr("dump", StringAttr::get(&getContext(), get_comb_attr().c_str()));
                     }
                 });

@@ -215,6 +215,7 @@ namespace {
                 OPERATION(MulFOp, "mul")
                 OPERATION(SubFOp, "sub")
                 OPERATION(TruncateIOp, "trunc")
+                OPERATION(SelectOp, "select")
 
                 op->dump();
                 assert(false);

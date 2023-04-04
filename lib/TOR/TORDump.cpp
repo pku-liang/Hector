@@ -251,6 +251,7 @@ namespace {
                 OPERATION(tor::MulFOp, "mul")
                 OPERATION(tor::SubFOp, "sub")
                 OPERATION(TruncateIOp, "trunc")
+                OPERATION(SelectOp, "select")
                 op->dump();
                 assert(false);
             }

@@ -294,8 +294,8 @@ namespace {
                 j["stages"] = json::array();
                 j["inits"] = json::array();
                 j["ii"] = get_attr_num(component->getAttr("II"));
-            } else if (style == "dynamic") {
-                assert(false);
+            } else if (style == "handshake") {
+                j["graph"] = json::array();
             }
             for (auto &op : *(component.getBody())) {
                 if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {
@@ -335,8 +335,13 @@ namespace {
                     sj["module_name"] = instance.componentName();
                     sj["names"] = json::array();
                     j["instances"].push_back(sj);
+                } else if (auto graph = dyn_cast<hec::GraphOp>(op)) {
+                    for (auto &sop : *(graph.getBody())) {
+                        j["graph"].push_back(get_json(&sop));
+                    }
                 } else {
                     op.dump();
+                    assert(false);
                 }
             }
 

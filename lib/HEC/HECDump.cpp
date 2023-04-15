@@ -296,6 +296,28 @@ namespace {
                 j["ii"] = get_attr_num(component->getAttr("II"));
             } else if (style == "handshake") {
                 j["graph"] = json::array();
+                j["sinks"] = json::array();
+                for (auto &op : *(component.getBody())) {
+                    if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {
+                        auto portInfo = primitive.getPrimitivePortInfo();
+                        for (unsigned idx = 0; idx < portInfo.size(); ++idx) {
+                            if (portInfo[idx].direction == hec::PortDirection::OUTPUT) {
+                                auto port = primitive.getResult(idx);
+                                int use_count = 0;
+                                for (auto &bval : port.getUses()) {
+                                    if (auto assign = dyn_cast<hec::AssignOp>(bval.getOwner())) {
+                                        if (assign.src() == port) {
+                                            ++use_count;
+                                        }
+                                    }
+                                }
+                                if (use_count == 0) {
+                                    j["sinks"].push_back(get_value(port));
+                                }
+                            }
+                        }
+                    }
+                }
             }
             for (auto &op : *(component.getBody())) {
                 if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {

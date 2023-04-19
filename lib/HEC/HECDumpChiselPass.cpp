@@ -1971,7 +1971,7 @@ namespace mlir {
                           "import hls._\n\n"
                           + chisel_code;
             std::cout << chisel_code << std::endl;
-            exit(-1);
+            exit(0);
         }
     };
 

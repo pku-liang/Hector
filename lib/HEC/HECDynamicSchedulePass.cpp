@@ -897,7 +897,7 @@ namespace mlir {
                 else CREATE_PRIMITIVE(tor::CmpFOp,
                                       std::string("cmp_float_") + tor::stringifyEnum(tor_op.predicate()).str(),
                                       "cmpf_")
-                else CREATE_PRIMITIVE(ShiftLeftOp, "shift_left", "shr_")
+                else CREATE_PRIMITIVE(ShiftLeftOp, "shift_left", "shl_")
                 else CREATE_PRIMITIVE(SelectOp, "select", "select_")
                 else CREATE_PRIMITIVE(NegFOp, "neg_float", "negf_")
                 else CREATE_PRIMITIVE(AndOp, "and", "and_")

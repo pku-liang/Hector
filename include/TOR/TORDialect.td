@@ -2,6 +2,7 @@
 #define TOR_DIALECT_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/DialectBase.td"
 
 def TORDialect : Dialect {
   let name = "tor";
@@ -10,14 +11,15 @@ def TORDialect : Dialect {
     This dialect defines the 'tor' dialect, which ...
   }];
   let cppNamespace = "::mlir::tor";
-  
+
+  let useDefaultTypePrinterParser = 1;
   let extraClassDeclaration = [{
-    /// Register all RTL types.
+    // Register all RTL types.
     void registerTypes();
   }];
 }
 
-class TOROp<string mnemonic, list<OpTrait> traits = []> :
+class TOROp<string mnemonic, list<Trait> traits = []> :
     Op<TORDialect, mnemonic, traits>;
 
 

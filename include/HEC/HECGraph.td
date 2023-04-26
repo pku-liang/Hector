@@ -16,12 +16,12 @@ def GraphOp : HECOp<"graph", [
   let regions = (region SizedRegion<1> : $body);
 
   let extraClassDeclaration = [{
-    /// Implement RegionKindInterface.
+    // Implement RegionKindInterface.
     static RegionKind getRegionKind(unsigned index) { return RegionKind::Graph; }
 
   }];
   let assemblyFormat = "$body attr-dict";
-  let verifier = "return ::verify$cppClass(*this);";
+  // let verifier = "return ::verify$cppClass(*this);";
 }
 
 #endif // HEC_GRAPH_TD

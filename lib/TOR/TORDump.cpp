@@ -5,8 +5,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
@@ -29,6 +29,7 @@
 
 namespace {
     using namespace mlir;
+    using namespace mlir::arith;
     using std::string;
     using nlohmann::json;
     namespace dump_tor {
@@ -107,9 +108,9 @@ namespace {
             json j;
             j["op_type"] = "for";
             j["names"] = json::array();
-            j["lb"] = get_value(forOp.lowerBound());
-            j["ub"] = get_value(forOp.upperBound());
-            j["step"] = get_value(forOp.step());
+            j["lb"] = get_value(forOp.getLowerBound());
+            j["ub"] = get_value(forOp.getUpperBound());
+            j["step"] = get_value(forOp.getStep());
             j["iter_name"] = get_value(forOp.getInductionVar());
             j["iter_args"] = json::array();
             j["iter_inits"] = json::array();
@@ -135,7 +136,7 @@ namespace {
             json j;
             j["op_type"] = "if";
             j["names"] = json::array();
-            j["condition"] = get_value(ifOp.condition());
+            j["condition"] = get_value(ifOp.getCondition());
             j["body0"] = json::array();
             j["body1"] = json::array();
             for (auto &op : *(ifOp.getBody())) {
@@ -177,7 +178,7 @@ namespace {
                 assert(loadOp.getNumOperands() == 2);
                 assert(loadOp->getNumResults() == 1);
                 j["index"] = get_value(loadOp.getOperand(1));
-                j["memory"] = get_value(loadOp.memref());
+                j["memory"] = get_value(loadOp.getMemref());
                 j["start"] = get_attr_num(loadOp->getAttr("starttime"));
                 j["end"] = get_attr_num(loadOp->getAttr("endtime"));
             } else if (auto yieldOp = dyn_cast<tor::YieldOp>(op)) {
@@ -196,14 +197,14 @@ namespace {
                 }
                 auto funcOp = dyn_cast<tor::FuncOp>(returnOp->getParentOp());
                 funcOp->walk([&](tor::TimeGraphOp op) {
-                    j["time"] = op.endtime();
+                    j["time"] = op.getEndtime();
                 });
             } else if (auto storeOp = dyn_cast<tor::StoreOp>(op)) {
                 assert(storeOp.getIndices().size() == 1);
                 j["op_type"] = "store";
-                j["index"] = get_value(storeOp.indices()[0]);
-                j["memory"] = get_value(storeOp.memref());
-                j["value"] = get_value(storeOp.value());
+                j["index"] = get_value(storeOp.getIndices()[0]);
+                j["memory"] = get_value(storeOp.getMemref());
+                j["value"] = get_value(storeOp.getValue());
                 j["start"] = get_attr_num(storeOp->getAttr("starttime"));
                 j["end"] = get_attr_num(storeOp->getAttr("endtime"));
             } else if (auto callOp = dyn_cast<tor::CallOp>(op)) {
@@ -223,7 +224,7 @@ namespace {
                 j["operands"] = json::array();
                 j["start"] = get_attr_num(cmpIOp->getAttr("starttime"));
                 j["end"] = get_attr_num(cmpIOp->getAttr("endtime"));
-                j["op_type"] = string("cmp_") + stringifyCmpIPredicate(cmpIOp.predicate()).str();
+                j["op_type"] = string("cmp_") + stringifyCmpIPredicate(cmpIOp.getPredicate()).str();
                 j["name"] = get_dump(cmpIOp);
                 j["type"] = get_type(cmpIOp.getResult().getType());
                 for (const auto &operand : cmpIOp->getOperands()) {
@@ -234,7 +235,7 @@ namespace {
                 j["operands"] = json::array();
                 j["start"] = get_attr_num(cmpFOp->getAttr("starttime"));
                 j["end"] = get_attr_num(cmpFOp->getAttr("endtime"));
-                j["op_type"] = string("cmp_") + stringifyCmpFPredicate(cmpFOp.predicate()).str();
+                j["op_type"] = string("cmp_") + stringifyCmpFPredicate(cmpFOp.getPredicate()).str();
                 j["name"] = get_dump(cmpFOp);
                 j["type"] = get_type(cmpFOp.getResult().getType());
                 for (const auto &operand : cmpFOp->getOperands()) {
@@ -242,7 +243,7 @@ namespace {
                 }
                 return j;
             } else {
-                OPERATION(ShiftLeftOp, "shift_left")
+                OPERATION(ShLIOp, "shift_left")
                 OPERATION(tor::AddIOp, "add")
                 OPERATION(tor::MulIOp, "mul")
                 OPERATION(tor::SubIOp, "sub")
@@ -250,11 +251,11 @@ namespace {
                 OPERATION(tor::AddFOp, "add")
                 OPERATION(tor::MulFOp, "mul")
                 OPERATION(tor::SubFOp, "sub")
-                OPERATION(TruncateIOp, "trunc")
+                OPERATION(TruncIOp, "trunc")
                 OPERATION(SelectOp, "select")
-                OPERATION(AndOp, "and")
-                OPERATION(OrOp, "or")
-                OPERATION(XOrOp, "xor")
+                OPERATION(AndIOp, "and")
+                OPERATION(OrIOp, "or")
+                OPERATION(XOrIOp, "xor")
                 OPERATION(tor::DivFOp, "div")
                 op->dump();
                 assert(false);
@@ -275,27 +276,27 @@ namespace {
             //TODO: types & args
 
 //            funcOp.getType().getInputs()
-            for (auto &op : *(funcOp.getBodyBlock())) {
+            for (auto &op : funcOp.getBody().front()) {
                 if (auto graph = dyn_cast<tor::TimeGraphOp>(op)) {
                     json sj;
-                    sj["start"] = graph.starttime();
-                    sj["end"] = graph.endtime();
+                    sj["start"] = graph.getStarttime();
+                    sj["end"] = graph.getEndtime();
                     sj["edge"] = json::array();
                     for (auto &sop : *(graph.getBody())) {
                         if (auto succOp = dyn_cast<tor::SuccTimeOp>(sop)) {
-                            int to = succOp.time();
-                            for (unsigned i = 0; i < succOp.points().size(); ++i) {
-                                auto from = succOp.points()[i];
-                                auto attrs = succOp.edges()[i].dyn_cast<DictionaryAttr>();
+                            int to = succOp.getTime();
+                            for (unsigned i = 0; i < succOp.getPoints().size(); ++i) {
+                                auto from = succOp.getPoints()[i];
+                                auto attrs = succOp.getEdges()[i].dyn_cast<DictionaryAttr>();
                                 json edge;
                                 edge["from"] = get_attr_num(from);
                                 edge["to"] = to;
                                 for (auto attr : attrs) {
-                                    auto edge_attr = attr.second;
+                                    auto edge_attr = attr.getValue();
                                     if (auto str_attr = edge_attr.dyn_cast<StringAttr>()) {
-                                        edge[attr.first.strref()] = str_attr.getValue();
+                                        edge[attr.getName().strref()] = str_attr.getValue();
                                     } else {
-                                        edge[attr.first.strref()] = get_attr_num(edge_attr);
+                                        edge[attr.getName().strref()] = get_attr_num(edge_attr);
                                     }
                                 }
                                 sj["edge"].push_back(edge);
@@ -337,11 +338,11 @@ namespace {
             j["modules"] = json::array();
             j["constants"] = json::array();
 
-            for (auto &op : *(designOp.getBody())) {
+            for (auto &op : designOp.getBody().front()) {
                 if (auto allocOp = dyn_cast<tor::AllocOp>(op)) {
                     json sj;
                     sj["name"] = get_dump(allocOp);
-                    auto mem_type = allocOp.memref().getType().dyn_cast<tor::MemRefType>();
+                    auto mem_type = allocOp.getMemref().getType().dyn_cast<tor::MemRefType>();
                     sj["size"] = mem_type.getShape()[0];
                     sj["type"] = get_type(mem_type.getElementType());
                     j["memory"].push_back(sj);
@@ -350,7 +351,7 @@ namespace {
                 } else if (auto nop = dyn_cast<ConstantOp>(op)) {
                     json sj;
                     sj["name"] = get_dump(nop);
-                    sj["operands"] = get_attr(nop.valueAttr());
+                    sj["operands"] = get_attr(nop.getValueAttr());
                     sj["type"] = get_type(nop.getType());
                     j["constants"].push_back(sj);
                 } else {

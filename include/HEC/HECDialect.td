@@ -2,6 +2,8 @@
 #define HEC_DIALECT_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/DialectBase.td"
+
 
 def HECDialect : Dialect {
   let name = "hec";
@@ -12,13 +14,14 @@ def HECDialect : Dialect {
   let cppNamespace = "::mlir::hec";
   
   let extraClassDeclaration = [{
-    /// Register all hec types.
-    void registerTypes();
+    // Register all hec types.
+    //void registerTypes();
   }];
 }
 
-class HECOp<string mnemonic, list<OpTrait> traits = []> :
+class HECOp<string mnemonic, list<Trait> traits = []> :
     Op<HECDialect, mnemonic, traits>;
+
 
 
 

@@ -24,7 +24,7 @@ def StateSetOp : HECOp<"stateset", [
 
   }];
   let assemblyFormat = "$body attr-dict";
-  let verifier = "return ::verify$cppClass(*this);";
+  //let verfier = "return ::verify$cppClass(*this);";
 }
 
 def StateOp : HECOp<"state", [
@@ -47,9 +47,8 @@ def StateOp : HECOp<"state", [
     OpBuilder<(ins "StringAttr" : $name, "IntegerAttr" : $initial)>
   ];
 
-  let verifier = "return ::verify$cppClass(*this);";
-  let printer = "return ::print$cppClass(p, *this);";
-  let parser = "return ::parse$cppClass(parser, result);";
+  let hasCustomAssemblyFormat = 1;
+  //let verfier = "return ::verify$cppClass(*this);";
 }
 
 def TransitionOp : HECOp<"transition", [
@@ -69,7 +68,7 @@ def TransitionOp : HECOp<"transition", [
 
   let regions = (region SizedRegion<1> : $body);
   let assemblyFormat = "$body attr-dict";
-  let verifier = "return ::verify$cppClass(*this);";
+  //let verfier = "return ::verify$cppClass(*this);";
 }
   
 def GotoOp : HECOp<"goto", [
@@ -92,7 +91,7 @@ def GotoOp : HECOp<"goto", [
     $dest (` ` `if` $cond^)? attr-dict
   }];
 
-  let verifier = "return ::verify$cppClass(*this);";
+  //let verfier = "return ::verify$cppClass(*this);";
 }
 
 def CDoneOp : HECOp<"cdone", [
@@ -111,7 +110,7 @@ def CDoneOp : HECOp<"cdone", [
   );
 
   let assemblyFormat = "attr-dict $cond `?` ($results^ `:` type($results))?";
-  let verifier = "return ::verify$cppClass(*this);";
+  //let verfier = "return ::verify$cppClass(*this);";
 }
 
 def DoneOp : HECOp<"done", [
@@ -129,7 +128,7 @@ def DoneOp : HECOp<"done", [
   );
 
   let assemblyFormat = "attr-dict ($results^ `:` type($results))?";
-  let verifier = "return ::verify$cppClass(*this);";
+  //let verfier = "return ::verify$cppClass(*this);";
 }
 
 

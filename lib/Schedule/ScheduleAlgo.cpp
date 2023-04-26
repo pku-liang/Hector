@@ -4,7 +4,7 @@
 
 #include "TOR/TOR.h"
 #include "Schedule/CDFG.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Schedule/ScheduleAlgo.h"
@@ -29,16 +29,16 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
   for (auto &op : llvm::reverse(block)) {
     if (auto ifOp = llvm::dyn_cast<tor::IfOp>(op)) {
 
-      if (!ifOp.elseRegion().empty()) {
+      if (!ifOp.getElseRegion().empty()) {
         
-        auto thenBB = buildCFG(ifOp.thenRegion().front(), parentLoop);
-        auto elseBB = buildCFG(ifOp.elseRegion().front(), parentLoop);
+        auto thenBB = buildCFG(ifOp.getThenRegion().front(), parentLoop);
+        auto elseBB = buildCFG(ifOp.getElseRegion().front(), parentLoop);
         
         BasicBlock::addControlDependency({thenBB.second, lastHead, ControlEdge::FORWARD});
         BasicBlock::addControlDependency({elseBB.second, lastHead, ControlEdge::FORWARD});
 
-        auto thenYieldOp = ifOp.thenRegion().back().getTerminator();
-        auto elseYieldOp = ifOp.elseRegion().back().getTerminator();
+        auto thenYieldOp = ifOp.getThenRegion().back().getTerminator();
+        auto elseYieldOp = ifOp.getElseRegion().back().getTerminator();
 
         for (unsigned i = 0, n = ifOp.getNumResults(); i < n; ++i) {
           Value x = ifOp.getResult(i);
@@ -63,7 +63,7 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
         BasicBlock::addControlDependency({lastHead, elseBB.first, ControlEdge::COND});
       } else {
 
-        auto thenBB = buildCFG(ifOp.thenRegion().front(), parentLoop);
+        auto thenBB = buildCFG(ifOp.getThenRegion().front(), parentLoop);
         
         BasicBlocks.push_back(
             std::make_unique<BasicBlock>(BasicBlock(parentLoop)));
@@ -101,18 +101,18 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
 
       LoopMap[&op] = curLoop;
 
-      auto bodyBB = buildCFG(whileOp.after().front(), curLoop);
-      auto condBB = buildCFG(whileOp.before().front(), curLoop);
+      auto bodyBB = buildCFG(whileOp.getAfter().front(), curLoop);
+      auto condBB = buildCFG(whileOp.getBefore().front(), curLoop);
 
       BasicBlock::addControlDependency({condBB.second, lastHead, ControlEdge::COND});
       BasicBlock::addControlDependency({condBB.second, bodyBB.first, ControlEdge::COND});
       BasicBlock::addControlDependency({bodyBB.second, condBB.first, ControlEdge::LOOPBACK});
       
-      auto yieldOp = whileOp.after().back().getTerminator();
+      auto yieldOp = whileOp.getAfter().back().getTerminator();
 
-      for (unsigned i = 0, n = whileOp.before().getNumArguments(); i < n; ++i) {
+      for (unsigned i = 0, n = whileOp.getBefore().getNumArguments(); i < n; ++i) {
         /// phi in cond argument
-        Value x = whileOp.before().getArgument(i);
+        Value x = whileOp.getBefore().getArgument(i);
 
         OpAbstract *newOpA = createOp(&op, curLoop, condBB.first, 
                                       {x},
@@ -123,13 +123,13 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
         condBB.first->addOperation(newOpA);
       }
       
-      auto condOp = whileOp.before().back().getTerminator(); /// the first operand of condop is condition
+      auto condOp = whileOp.getBefore().back().getTerminator(); /// the first operand of condop is condition
       
       condBB.second->setBranchValue(condOp->getOperand(0));
 
-      for (unsigned i = 0, n = whileOp.after().getNumArguments(); i < n; ++i) {
+      for (unsigned i = 0, n = whileOp.getAfter().getNumArguments(); i < n; ++i) {
         /// assign in body arguments
-        Value x = whileOp.after().getArgument(i);
+        Value x = whileOp.getAfter().getArgument(i);
         OpAbstract *newOpA = createOp(&op, curLoop, bodyBB.first, 
                                       {x},
                                       {condOp->getOperand(i + 1)},
@@ -173,11 +173,11 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
 
     } else if (auto storeOp = llvm::dyn_cast<tor::StoreOp>(op)) {
 
-      Value mem = storeOp.getMemRef();
+      Value mem = storeOp.getMemref();
       std::vector<Value> operands{storeOp.getIndices().begin(),
 				  storeOp.getIndices().end()
       };
-      operands.push_back(storeOp.getValueToStore());
+      operands.push_back(storeOp.getValue());
       
       OpAbstract *newOpA = createMemOp(&op, parentLoop, lastHead,
 				       std::vector<Value>{mem},
@@ -215,7 +215,7 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
       Value induction = forOp.getInductionVar();
       OpAbstract *newOpA = createOp(&op, curLoop, bodyBB.first, 
                                     std::vector<Value>{induction},
-                                    std::vector<Value>{forOp.lowerBound(), induction},
+                                    std::vector<Value>{forOp.getLowerBound(), induction},
                                     OpAbstract::OpType::PHI_OP);
       bodyBB.first->addOperation(newOpA);
       ValueMap.insert(std::make_pair(induction, newOpA));
@@ -225,7 +225,7 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
         Value x = iter.value();
         OpAbstract *newOpA = createOp(&op, curLoop, bodyBB.first,
                                       std::vector<Value>{x},
-                                      std::vector<Value>{forOp.initArgs()[iter.index()], yieldOp->getOperand(iter.index())},
+                                      std::vector<Value>{forOp.getInitArgs()[iter.index()], yieldOp->getOperand(iter.index())},
                                       OpAbstract::OpType::PHI_OP);
         ValueMap.insert(std::make_pair(x, newOpA));
         bodyBB.first->addOperation(newOpA);
@@ -390,8 +390,8 @@ void ScheduleBase::buildFromContaingOp() {
     // We need to manually add the constantOp which is not in the current
     // funcOp.
     auto designOp = llvm::dyn_cast<tor::DesignOp>(funcOp->getParentOp());
-    for (auto &op : designOp.getBody()->getOperations())
-      if (auto constOp = llvm::dyn_cast<ConstantOp>(op)) {
+    for (auto &op : designOp.getBody().front().getOperations())
+      if (auto constOp = llvm::dyn_cast<arith::ConstantOp>(op)) {
 	OpAbstract *opA =
 	  createOp(constOp, nullptr, bbs.first,
 		   {constOp.getResult()},

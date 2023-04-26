@@ -2,15 +2,19 @@
 #define HEC_OPS_H
 
 #include "HEC/HECDialect.h"
-#include "HEC/HECTypes.h"
 
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/FunctionSupport.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/RegionKindInterface.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 
 namespace mlir
 {

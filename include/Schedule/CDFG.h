@@ -230,12 +230,12 @@ public:
     assert(llvm::isa<tor::LoadOp>(op) || llvm::isa<tor::StoreOp>(op));
 
     if (auto loadOp = llvm::dyn_cast<tor::LoadOp>(op)) {
-      memref = loadOp.getMemRef();
+      memref = loadOp.getMemref();
       addr = loadOp.getOperand(
           1); // the first index is the address in the memory bank
       partitionIndices = loadOp.getIndices().drop_front(1);
     } else if (auto storeOp = llvm::dyn_cast<tor::StoreOp>(op)) {
-      memref = storeOp.getMemRef();
+      memref = storeOp.getMemref();
       addr = storeOp.getOperand(
           1); // the first index is the address in the memory bank
       partitionIndices = storeOp.getIndices().drop_front(1);

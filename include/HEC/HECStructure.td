@@ -1,7 +1,7 @@
 #ifndef HEC_STRUCTURE_TD
 #define HEC_STRUCTURE_TD
 
-class HECContainer<string mnemonic, list<OpTrait> traits = []> :
+class HECContainer<string mnemonic, list<Trait> traits = []> :
   HECOp<mnemonic, !listconcat(traits, [
     NoRegionArguments,
     NoTerminator,
@@ -35,9 +35,9 @@ def DesignOp : HECOp<"design", [
 
   let extraClassDeclaration = [{
     // return the body of a HEC design.
-    Block *getBody() {
+    /*Block *getBody() {
       return &getOperation()->getRegion(0).front();
-    }
+    }*/
     
     // Returns the main component, representing the entry point of the design.
     ComponentOp getMainComponent() {
@@ -46,13 +46,13 @@ def DesignOp : HECOp<"design", [
   }];
 
   let assemblyFormat = "$symbol $body attr-dict";
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def ComponentOp : HECOp<"component", [
     HasParent<"DesignOp">,
     Symbol,
-    FunctionLike,
+    FunctionOpInterface,
     /*IsolatedFromAbove,*/
     SingleBlock,
     NoTerminator
@@ -78,6 +78,7 @@ def ComponentOp : HECOp<"component", [
     * `ready`, `valid` for wrapped
   }];
   let arguments = (ins
+    TypeAttrOf<FunctionType>:$function_type,
     ArrayAttr : $portNames,
     I64Attr : $numInPorts,
     StrAttr : $interfc,
@@ -93,21 +94,19 @@ def ComponentOp : HECOp<"component", [
   ];
 
   let extraClassDeclaration = [{
-    using FunctionLike::front;
-    private:
-      friend class OpTrait::FunctionLike<ComponentOp>;
-      unsigned getNumFuncArguments() { return getType().getNumInputs(); }
-      unsigned getNumFuncResults() { return getType().getNumResults(); }
-    public:
-      Block *getBody() {
-        return &getOperation()->getRegion(0).front();
-      }
-      StateSetOp getStateSetOp();
-      GraphOp getGraphOp();
+    //using FunctionOpInterface::front;
+    // friend class OpTrait::FunctionOpInterface<ComponentOp>;
+    // unsigned getNumFuncArguments() { return getType().getNumInputs(); }
+    // unsigned getNumFuncResults() { return getType().getNumResults(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+    StateSetOp getStateSetOp();
+    GraphOp getGraphOp();
   }];
-  let verifier = "return ::verify$cppClass(*this);";
-  let printer = "return ::print$cppClass(p, *this);";
-  let parser = "return ::parse$cppClass(parser, result);";
+
+  let skipDefaultBuilders = 1;
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def InstanceOp : HECOp<"instance", [
@@ -137,11 +136,11 @@ def InstanceOp : HECOp<"instance", [
   let assemblyFormat = [{
     $instanceName $componentName attr-dict (`:` type($results)^)?
   }];
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def PrimitiveOp : HECOp<"primitive", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ParentOneOf<["ComponentOp", "DesignOp"]>
   ]> {
 
@@ -168,7 +167,7 @@ def PrimitiveOp : HECOp<"primitive", [
   let assemblyFormat = [{
     $instanceName ` ` `is` $primitiveName attr-dict (`:` type($results)^)? 
   }];
-  let verifier = "return ::verify$cppClass(*this);";
+  //let verifier = "return ::verify$cppClass(*this);";
 }
 
 

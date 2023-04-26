@@ -61,6 +61,7 @@ def TOR_MemRef : TOR_Type<"MemRef", "mlir::tor::BaseMemRefType"> {
                    rw /*, nonDefaultMemorySpace*/);
     }]>
   ];
+  let hasCustomAssemblyFormat = 1;
 
   let extraClassDeclaration = [{
     class Builder;

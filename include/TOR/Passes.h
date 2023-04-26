@@ -8,11 +8,11 @@
 namespace mlir {
     std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createTORSchedulePass();
 
-    std::unique_ptr<OperationPass<mlir::ModuleOp>> createTORPipelinePartitionPass();
+    // std::unique_ptr<OperationPass<mlir::ModuleOp>> createTORPipelinePartitionPass();
 
     std::unique_ptr<OperationPass<mlir::ModuleOp>> createTORSplitPass();
 
-    std::unique_ptr<OperationPass<mlir::ModuleOp>> createTORCheckPass();
+    // std::unique_ptr<OperationPass<mlir::ModuleOp>> createTORCheckPass();
 
     std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createSCFToTORPass();
 
@@ -20,7 +20,7 @@ namespace mlir {
 
     std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createTORDumpPass();
 
-    std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createWidthAnalysisPass();
+    // std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createWidthAnalysisPass();
 
 #define GEN_PASS_REGISTRATION
 

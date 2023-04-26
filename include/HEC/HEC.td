@@ -9,8 +9,9 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/RegionKindInterface.td"
-
-include "HECTypes.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/IR/FunctionInterfaces.td"
+include "mlir/IR/EnumAttr.td"
 
 include "HECStructure.td"
 include "HECExpr.td"

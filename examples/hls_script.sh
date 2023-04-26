@@ -1,6 +1,6 @@
-PROJECT_DIR=`pwd`
-BIN=`realpath ./$1`
-KERNEL_DIR=`realpath ./$2`
+PROJECT_DIR=$(pwd)
+BIN=$(realpath ./$1)
+KERNEL_DIR=$(realpath ./$2)
 
 echo "$BIN"
 echo "$KERNEL_DIR"
@@ -29,52 +29,49 @@ rm -f $KERNEL_DIR/chisel/*
 rm -f $KERNEL_DIR/hec_dyn/*
 rm -f $KERNEL_DIR/chisel_dyn/*
 
-for kernel_dir in "$KERNEL_DIR"/tuned/*.mlir
-do
-  kernel="$(basename "$kernel_dir")"
-  chisel_file="${kernel%.*}.scala"
-  fail_log="${kernel%.*}.log"
-  echo "kernel: $kernel"
+for kernel_dir in "$KERNEL_DIR"/tuned/*.mlir; do
+	kernel="$(basename "$kernel_dir")"
+	chisel_file="${kernel%.*}.scala"
+	fail_log="${kernel%.*}.log"
+	echo "kernel: $kernel"
 
-  COMMAND0="$BIN $SCF_TO_TOR $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel""
-  echo "$COMMAND0"
-  $BIN $SCF_TO_TOR $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel" >out 2>error
+	COMMAND0="$BIN --dump-scf $SCF_TO_TOR $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel""
+	echo "$COMMAND0"
+	$BIN --dump-scf $SCF_TO_TOR $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel" >out 2>error
 
-  COMMAND1="$BIN $SPLIT "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/tor-split/$kernel""
-  echo "$COMMAND1"
-  $BIN $SPLIT "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/tor-split/$kernel" >out 2>error
+	COMMAND1="$BIN $SPLIT --dump-tor "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/tor-split/$kernel""
+	echo "$COMMAND1"
+	$BIN $SPLIT --dump-tor "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/tor-split/$kernel" >out 2>error
 
-  COMMAND2="$BIN $HECGEN "$KERNEL_DIR/tor-split/$kernel" -o "$KERNEL_DIR/hec/$kernel""
-  echo "$COMMAND2"
-  $BIN $HECGEN "$KERNEL_DIR/tor-split/$kernel" -o "$KERNEL_DIR/hec/$kernel" >out 2>error
-  
-  COMMAND3="$BIN $DYNAMIC "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/hec_dyn/$kernel""
-  echo "$COMMAND3"
-  $BIN $DYNAMIC -mlir-disable-threading "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/hec_dyn/$kernel" >out 2>error
-  
-  $BIN $SCF_TO_TOR $SCHEDULE $SPLIT $HECGEN $KERNEL_DIR/tuned/$kernel -o $KERNEL_DIR/hec/$kernel >out 2>error
+	COMMAND2="$BIN $HECGEN --dump-hec "$KERNEL_DIR/tor-split/$kernel" -o "$KERNEL_DIR/hec/$kernel""
+	echo "$COMMAND2"
+	$BIN $HECGEN --dump-hec "$KERNEL_DIR/tor-split/$kernel" -o "$KERNEL_DIR/hec/$kernel" >out 2>error
+
+	COMMAND3="$BIN --dump-tor $DYNAMIC --dump-hec "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/hec_dyn/$kernel""
+	echo "$COMMAND3"
+	$BIN --dump-tor $DYNAMIC -mlir-disable-threading --dump-hec "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/hec_dyn/$kernel" >out 2>error
+
+	#$BIN --dump-scf $SCF_TO_TOR $SCHEDULE $SPLIT --dump-tor $HECGEN --dump-hec $KERNEL_DIR/tuned/$kernel -o $KERNEL_DIR/hec/$kernel >out 2>error
 done
 
-for kernel_dir in "$KERNEL_DIR"/hec/*.mlir
-do
-  kernel="$(basename "$kernel_dir")"
-  chisel_file="${kernel%.*}.scala"
-  fail_log="${kernel%.*}.log"
-  echo "kernel: $kernel"
+for kernel_dir in "$KERNEL_DIR"/hec/*.mlir; do
+	kernel="$(basename "$kernel_dir")"
+	chisel_file="${kernel%.*}.scala"
+	fail_log="${kernel%.*}.log"
+	echo "kernel: $kernel"
 
-  COMMAND4="$BIN $DUMPCHISEL "$KERNEL_DIR/hec/$kernel" > "$KERNEL_DIR/chisel/$chisel_file""
-  echo "$COMMAND4"
-  $BIN $DUMPCHISEL "$KERNEL_DIR/hec/$kernel" >"$KERNEL_DIR/chisel/$chisel_file" 2>error
+	COMMAND4="$BIN $DUMPCHISEL "$KERNEL_DIR/hec/$kernel" > "$KERNEL_DIR/chisel/$chisel_file""
+	echo "$COMMAND4"
+	$BIN $DUMPCHISEL "$KERNEL_DIR/hec/$kernel" >"$KERNEL_DIR/chisel/$chisel_file" 2>error
 done
 
-for kernel_dir in "$KERNEL_DIR"/hec_dyn/*.mlir
-do
-  kernel="$(basename "$kernel_dir")"
-  chisel_file="${kernel%.*}.scala"
-  fail_log="${kernel%.*}.log"
-  echo "kernel: $kernel"
+for kernel_dir in "$KERNEL_DIR"/hec_dyn/*.mlir; do
+	kernel="$(basename "$kernel_dir")"
+	chisel_file="${kernel%.*}.scala"
+	fail_log="${kernel%.*}.log"
+	echo "kernel: $kernel"
 
-  COMMAND5="$BIN $DUMPCHISEL "$KERNEL_DIR/hec_dyn/$kernel" > "$KERNEL_DIR/chisel_dyn/$chisel_file""
-  echo "$COMMAND5"
-  $BIN $DUMPCHISEL "$KERNEL_DIR/hec_dyn/$kernel" >"$KERNEL_DIR/chisel_dyn/$chisel_file" 2>error
+	COMMAND5="$BIN $DUMPCHISEL "$KERNEL_DIR/hec_dyn/$kernel" > "$KERNEL_DIR/chisel_dyn/$chisel_file""
+	echo "$COMMAND5"
+	$BIN $DUMPCHISEL "$KERNEL_DIR/hec_dyn/$kernel" >"$KERNEL_DIR/chisel_dyn/$chisel_file" 2>error
 done

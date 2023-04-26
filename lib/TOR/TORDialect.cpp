@@ -11,21 +11,23 @@
 using namespace mlir;
 using namespace mlir::tor;
 
-struct TORInlinerInterface : public DialectInlinerInterface {
-  using DialectInlinerInterface::DialectInlinerInterface;
+// struct TORInlinerInterface : public DialectInlinerInterface {
+//   using DialectInlinerInterface::DialectInlinerInterface;
 
-  bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final {
-    return true;
-  }
+//   bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final {
+//     return true;
+//   }
 
-  void handleTerminator(Operation *op, ArrayRef<Value> valuesToRepl) const final {
-    auto returnOp = cast<tor::ReturnOp>(op);
+//   void handleTerminator(Operation *op, ArrayRef<Value> valuesToRepl) const final {
+//     auto returnOp = cast<tor::ReturnOp>(op);
 
-    assert(returnOp.getNumOperands() == valuesToRepl.size());
-    for (const auto &it : llvm::enumerate(returnOp.getOperands()))
-      valuesToRepl[it.index()].replaceAllUsesWith(it.value());
-  }
-};
+//     assert(returnOp.getNumOperands() == valuesToRepl.size());
+//     for (const auto &it : llvm::enumerate(returnOp.getOperands()))
+//       valuesToRepl[it.index()].replaceAllUsesWith(it.value());
+//   }
+// };
+
+#include "TOR/TORDialect.cpp.inc"
 
 void TORDialect::initialize()
 {
@@ -34,7 +36,7 @@ void TORDialect::initialize()
 #define GET_OP_LIST
 #include "TOR/TOR.cpp.inc"
       >();
-  addInterfaces<TORInlinerInterface>();
+  // addInterfaces<TORInlinerInterface>();
 }
 
 // Provide implementations for the enums we use.

@@ -1,8 +1,5 @@
 module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", llvm.target_triple = "x86_64-unknown-linux-gnu"}  {
   tor.design @stencil {
-    %arg0 = tor.alloc : !tor.memref<8192xi32, [], "r">
-    %arg1 = tor.alloc : !tor.memref<8192xi32, [], "w">
-    %arg2 = tor.alloc : !tor.memref<9xi32, [], "r">
     tor.func @main() -> ()
     attributes {resource="../examples/resource_dynamatic.json", clock=6.0} {
       %c1 = arith.constant 1 : index
@@ -24,12 +21,12 @@ module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i6
               %test = arith.shli %arg5, %c11 : index
               %4 = arith.addi %arg5, %test : index
               %5 = arith.addi %4, %arg8 : index
-              %6 = tor.load %arg2[%5] on (0 to 0) : !tor.memref<9xi32, [], "r">[index]
+              %6 = arith.index_cast %5 : index to i32
               %7 = arith.addi %arg3, %arg5 : index
               %8 = arith.shli %7, %c6 : index
               %9 = arith.addi %8, %arg4 : index
               %10 = arith.addi %9, %arg8 : index
-              %11 = tor.load %arg0[%10] on (0 to 0) : !tor.memref<8192xi32, [], "r">[index]
+              %11 = arith.index_cast %10: index to i32
               %12 = arith.muli %6, %11 : i32
               %13 = arith.addi %arg9, %12 : i32
               scf.yield %13: i32
@@ -38,7 +35,6 @@ module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i6
           }
           %1 = arith.shli %arg3, %c6 : index
           %2 = arith.addi %1, %arg4 : index
-          tor.store %0 to %arg1[%2] on (0 to 0) : (i32, !tor.memref<8192xi32, [], "w">[index])
         }
       }
       tor.return

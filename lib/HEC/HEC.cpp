@@ -7,6 +7,8 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/FunctionImplementation.h"
+#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
@@ -16,15 +18,16 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+
 using namespace mlir;
 using namespace hec;
 
 //===----------------------------------------------------------------------===//
 // DesignOp
 //===----------------------------------------------------------------------===//
-static LogicalResult verifyDesignOp(DesignOp design) {
-    // if (!design.getMainComponent())
-    //     return design.emitOpError("must contain one \"main\" component");
+LogicalResult DesignOp::verify() {
+    if (!this->getMainComponent())
+        return this->emitOpError("must contain one \"main\" component");
     return success();
 }
 
@@ -33,25 +36,25 @@ static LogicalResult verifyDesignOp(DesignOp design) {
 //===----------------------------------------------------------------------===//
 
 StateSetOp ComponentOp::getStateSetOp() {
-    return *getBody()->getOps<StateSetOp>().begin();
+    return *(getBody().getOps<StateSetOp>().begin());
 }
 
 GraphOp ComponentOp::getGraphOp() {
-    return *getBody()->getOps<GraphOp>().begin();
+    return *(getBody().getOps<GraphOp>().begin());
 }
 
 // Returns the type of a given component as a function type.
-static FunctionType getComponentType(ComponentOp component) {
-    return component.getTypeAttr().getValue().cast<FunctionType>();
-}
+// static FunctionType getComponentType(ComponentOp component) {
+//     return component.getTypeAttr().getValue().cast<FunctionType>();
+// }
 
 // Returns the port information for a given component
 SmallVector<ComponentPortInfo> mlir::hec::getComponentPortInfo(Operation *op) {
     assert(isa<ComponentOp>(op) && "Can only get port info from a ComponentOp");
     auto component = dyn_cast<ComponentOp>(op);
-    auto portTypes = getComponentType(component).getInputs();
-    auto portNamesAttr = component.portNames();
-    uint64_t numInPorts = component.numInPorts();
+    auto portTypes = component.getArgumentTypes();
+    auto portNamesAttr = component.getPortNames();
+    uint64_t numInPorts = component.getNumInPorts();
 
     SmallVector<ComponentPortInfo> results;
     for (uint64_t i = 0, e = portNamesAttr.size(); i != e; ++i) {
@@ -61,14 +64,15 @@ SmallVector<ComponentPortInfo> mlir::hec::getComponentPortInfo(Operation *op) {
     return results;
 }
 
-static void printComponentOp(OpAsmPrinter &p, ComponentOp &op) {
-    auto componentName =
-            op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
-                    .getValue();
-    p << "hec.component ";
+void ComponentOp::print(OpAsmPrinter &p) {
+    auto componentName = (*this)->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+        .getValue();
+
+    // p << "hec.component ";
+    p << " ";
     p.printSymbolName(componentName);
 
-    auto ports = getComponentPortInfo(op);
+    auto ports = getComponentPortInfo(*this);
     SmallVector<ComponentPortInfo, 4> inPorts, outPorts;
     for (auto &&port : ports) {
         if (port.direction == PortDirection::INPUT)
@@ -77,26 +81,17 @@ static void printComponentOp(OpAsmPrinter &p, ComponentOp &op) {
             outPorts.push_back(port);
     }
 
-    // auto printPortList = [&](auto ports)
-    // {
-    //   p << "(";
-    //   llvm::interleaveComma(ports, p, [&](auto port)
-    //                         { p << "%" << port.name.getValue() << ": " <<
-    //                         port.type; });
-    //   p << ")";
-    // };
-
-    auto numInPorts = op.numInPorts();
-    auto numPorts = op.getNumArguments();
+    auto numInPorts = this->getNumInPorts();
+    auto numPorts = this->getNumArguments();
     uint64_t count = 0;
     p << "(";
-    if (op.getNumArguments() == 0) {
+    if (this->getNumArguments() == 0) {
         p << ") -> ()";
     } else if (numInPorts == 0) {
         p << ") -> (";
     }
 
-    for (auto arg : op.getArguments()) {
+    for (auto arg : this->getArguments()) {
         p.printOperand(arg);
         p << ": " << arg.getType();
 
@@ -108,56 +103,47 @@ static void printComponentOp(OpAsmPrinter &p, ComponentOp &op) {
         else
             p << ",";
     }
-    // printPortList(inPorts);
-    // p << " -> ";
-    // printPortList(outPorts);
-    p << "\n\t\t{interface=\"" << op.interfc() << "\", style=\"" << op.style()
+    
+    p << "\n\t\t{interface=\"" << this->getInterfc() << "\", style=\"" << this->getStyle()
       << "\"}";
 
-    p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+    p.printRegion(this->getBody(), /*printEntryBlockArgs=*/false,
             /*printBlockTerminators=*/true,
             /*printEmptyBlock=*/false);
 
-    p.printOptionalAttrDict(op->getAttrs(),
+    p.printOptionalAttrDict((*this)->getAttrs(),
             /*elidedAttrs=*/{"interfc", "style", "numInPorts",
-                             "portNames", "sym_name", "type"});
+                             "portNames", "sym_name", "function_type"});
 }
 
-/// Parses the ports of a HEC component signature, and adds the corresponding
-/// port names to `attrName`.
-static ParseResult
-parsePortDefList(OpAsmParser &parser, OperationState &result,
-                 SmallVectorImpl<OpAsmParser::OperandType> &ports,
-                 SmallVectorImpl<Type> &portTypes) {
+// Parses the ports of a HEC component signature, and adds the corresponding
+// port names to `attrName`.
+ParseResult parsePortDefList(OpAsmParser &parser, OperationState &result,
+                 SmallVectorImpl<OpAsmParser::Argument> &ports) {
+
     if (parser.parseLParen())
         return failure();
-
     do {
-        OpAsmParser::OperandType port;
+        OpAsmParser::Argument port;
         Type portType;
-        if (failed(parser.parseOptionalRegionArgument(port)) ||
-            failed(parser.parseOptionalColon()) ||
-            failed(parser.parseType(portType)))
+        if (parser.parseOptionalArgument(port, true).value())
             continue;
+
         ports.push_back(port);
-        portTypes.push_back(portType);
     } while (succeeded(parser.parseOptionalComma()));
 
     return parser.parseRParen();
 }
 
 /// Parses the signature of a HEC component.
-static ParseResult
-parseComponentSignature(OpAsmParser &parser, OperationState &result,
-                        SmallVectorImpl<OpAsmParser::OperandType> &ports,
-                        SmallVectorImpl<Type> &portTypes) {
-    if (parsePortDefList(parser, result, ports, portTypes))
+ParseResult parseComponentSignature(OpAsmParser &parser, OperationState &result,
+                        SmallVectorImpl<OpAsmParser::Argument> &ports) {
+    if (parsePortDefList(parser, result, ports))
         return failure();
-
     // Record the number of input ports.
     size_t numInPorts = ports.size();
 
-    if (parser.parseArrow() || parsePortDefList(parser, result, ports, portTypes))
+    if (parser.parseArrow() || parsePortDefList(parser, result, ports))
         return failure();
 
     auto *context = parser.getBuilder().getContext();
@@ -165,7 +151,7 @@ parseComponentSignature(OpAsmParser &parser, OperationState &result,
     // just inferred from the SSA names of the component.
     SmallVector<Attribute> portNames(ports.size());
     llvm::transform(ports, portNames.begin(), [&](auto port) -> StringAttr {
-        StringRef name = port.name;
+        StringRef name = port.ssaName.name;
         if (name.startswith("%"))
             name = name.drop_front();
         return StringAttr::get(context, name);
@@ -179,7 +165,7 @@ parseComponentSignature(OpAsmParser &parser, OperationState &result,
     return success();
 }
 
-static ParseResult parseComponentOp(OpAsmParser &parser,
+ParseResult ComponentOp::parse(OpAsmParser &parser,
                                     OperationState &result) {
     // using namespace mlir::function_like_impl;
 
@@ -190,13 +176,17 @@ static ParseResult parseComponentOp(OpAsmParser &parser,
                                result.attributes))
         return failure();
 
-    SmallVector<OpAsmParser::OperandType> ports;
-    SmallVector<Type> portTypes;
-    if (parseComponentSignature(parser, result, ports, portTypes))
+    SmallVector<OpAsmParser::Argument> ports;
+    if (parseComponentSignature(parser, result, ports))
         return failure();
 
     // Build the component's type for FunctionLike trait. All ports are listed as
     // arguments so they may be accessed within the component.
+    SmallVector<Type> portTypes;
+    for (auto port : ports) {
+        portTypes.push_back(port.type);
+    }
+    
     auto type =
             parser.getBuilder().getFunctionType(portTypes, /*resultTypes=*/{});
     result.addAttribute(ComponentOp::getTypeAttrName(), TypeAttr::get(type));
@@ -218,7 +208,7 @@ static ParseResult parseComponentOp(OpAsmParser &parser,
     result.addAttribute("style", style);
 
     auto *body = result.addRegion();
-    if (parser.parseRegion(*body, ports, portTypes))
+    if (parser.parseRegion(*body, ports))
         return failure();
 
     if (body->empty())
@@ -227,72 +217,25 @@ static ParseResult parseComponentOp(OpAsmParser &parser,
     mlir::NamedAttrList additionalAttrs;
     if (!parser.parseOptionalAttrDict(additionalAttrs)) {
         for (auto attr : additionalAttrs) {
-            result.addAttribute(attr.first, attr.second);
+            result.addAttribute(attr.getName(), attr.getValue());
         }
     }
 
     return success();
 }
 
-static LogicalResult verifyComponentOp(ComponentOp op) {
-    // Verify there is exactly one of either section:
-    //    hec.graph, hec.stateset，hec.stageset
-    // corresponding to style attribute
-    /*
-    uint32_t numStateSet = 0, numGraph = 0;
-    for (auto &bodyOp : *op.getBody()) {
-      if (isa<StateSetOp>(bodyOp))
-        ++numStateSet;
-      else if (isa<GraphOp>(bodyOp))
-        ++numGraph;
-    }
-    llvm::StringRef style = op.style();
-    if (numStateSet + numGraph != 1 || (style == "STG" && numStateSet != 1) ||
-        (style == "handshake" && numGraph != 1))
-      return op.emitOpError()
-             << "hec.component must contain either a hec.stateset"
-                " or a hec.graph according to style";
-    */
-
+LogicalResult ComponentOp::verify() {
     // Verify the number of input ports.
-    SmallVector<ComponentPortInfo> componentPorts = getComponentPortInfo(op);
+    SmallVector<ComponentPortInfo> componentPorts = getComponentPortInfo(*this);
     uint64_t expectedNumInPorts =
-            op->getAttrOfType<IntegerAttr>("numInPorts").getInt();
+            (*this)->getAttrOfType<IntegerAttr>("numInPorts").getInt();
     uint64_t actualNumInPorts = llvm::count_if(componentPorts, [](auto port) {
         return port.direction == PortDirection::INPUT;
     });
     if (expectedNumInPorts != actualNumInPorts)
-        return op.emitOpError()
+        return this->emitOpError()
                 << "has mismatched number of in ports. Expected: "
                 << expectedNumInPorts << ", actual: " << actualNumInPorts;
-
-    // // Verify the component has the following ports.
-    // // TODO(Calyx): Eventually, we want to attach attributes to these
-    // arguments. bool go = false, clk = false, reset = false, done = false; for
-    // (auto &&port : componentPorts)
-    // {
-    //   if (!port.type.isInteger(1))
-    //     // Each of the ports has bit width 1.
-    //     continue;
-
-    //   StringRef portName = port.name.getValue();
-    //   if (port.direction == PortDirection::OUTPUT)
-    //   {
-    //     done |= (portName == "done");
-    //   }
-    //   else
-    //   {
-    //     go |= (portName == "go");
-    //     clk |= (portName == "clk");
-    //     reset |= (portName == "reset");
-    //   }
-    //   if (go && clk && reset && done)
-    //     return success();
-    // }
-    // return op->emitOpError() << "does not have required 1-bit input ports `go`,
-    // "
-    //                             "`clk`, `reset`, and output port `done`";
-
     return success();
 }
 
@@ -345,7 +288,11 @@ void ComponentOp::build(OpBuilder &builder, OperationState &result,
     regionBody->push_back(block);
 
     // Add all ports to the body block.
-    block->addArguments(portTypes);
+    SmallVector<Location, 8> locations(portTypes.size(), result.location);
+    // for (unsigned i = 0; i < portTypes.size(); ++i) {
+    //     locations.push_back(result.location);
+    // }
+    block->addArguments(portTypes, locations);
 
     // Insert the WiresOp and ControlOp.
     IRRewriter::InsertionGuard guard(builder);
@@ -368,55 +315,55 @@ ComponentOp InstanceOp::getReferencedComponent() {
     auto design = (*this)->getParentOfType<DesignOp>();
     if (!design)
         return nullptr;
-    return design.lookupSymbol<ComponentOp>(componentName());
+    return design.lookupSymbol<ComponentOp>(getComponentName());
 }
 
-/// Provide meaningful names to the result values of a CellOp.
-void InstanceOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-    auto component = getReferencedComponent();
-    auto portNames = component.portNames();
+// Provide meaningful names to the result values of a CellOp.
+// void InstanceOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+//     auto component = getReferencedComponent();
+//     auto portNames = component.portNames();
 
-    std::string prefix = instanceName().str() + ".";
-    for (size_t i = 0, e = portNames.size(); i != e; ++i) {
-        StringRef portName = portNames[i].cast<StringAttr>().getValue();
-        setNameFn(getResult(i), prefix + portName.str());
-    }
-}
+//     std::string prefix = instanceName().str() + ".";
+//     for (size_t i = 0, e = portNames.size(); i != e; ++i) {
+//         StringRef portName = portNames[i].cast<StringAttr>().getValue();
+//         setNameFn(getResult(i), prefix + portName.str());
+//     }
+// }
 
-static LogicalResult verifyInstanceOp(InstanceOp instance) {
-    if (instance.componentName() == "main")
-        return instance.emitOpError("cannot reference the main component.");
+LogicalResult InstanceOp::verify() {
+    if (this->getComponentName() == "main")
+        return this->emitOpError("cannot reference the main component.");
 
     // Verify the referenced component exists in this program.
-    ComponentOp referencedComponent = instance.getReferencedComponent();
+    ComponentOp referencedComponent = this->getReferencedComponent();
     if (!referencedComponent)
-        return instance.emitOpError()
-                << "is referencing component: " << instance.componentName()
+        return this->emitOpError()
+                << "is referencing component: " << this->getComponentName()
                 << ", which does not exist.";
 
     // Verify the referenced component is not instantiating itself.
-    auto parentComponent = instance->getParentOfType<ComponentOp>();
+    auto parentComponent = (*this)->getParentOfType<ComponentOp>();
     if (parentComponent == referencedComponent)
-        return instance.emitOpError()
+        return this->emitOpError()
                 << "is a recursive instantiation of its parent component: "
-                << instance.componentName();
+                << this->getComponentName();
 
     // Verify the instance result ports with those of its referenced component.
     SmallVector<ComponentPortInfo> componentPorts =
             getComponentPortInfo(referencedComponent);
 
-    size_t numResults = instance.getNumResults();
+    size_t numResults = this->getNumResults();
     if (numResults != componentPorts.size())
-        return instance.emitOpError()
+        return this->emitOpError()
                 << "has a wrong number of results; expected: "
                 << componentPorts.size() << " but got " << numResults;
 
     for (size_t i = 0; i != numResults; ++i) {
-        auto resultType = instance.getResult(i).getType();
+        auto resultType = this->getResult(i).getType();
         auto expectedType = componentPorts[i].type;
         if (resultType == expectedType)
             continue;
-        return instance.emitOpError()
+        return this->emitOpError()
                 << "result type for " << componentPorts[i].name << " must be "
                 << expectedType << ", but got " << resultType;
     }
@@ -431,7 +378,7 @@ static LogicalResult verifyInstanceOp(InstanceOp instance) {
 // Returns the port information for a given primitive
 
 SmallVector<ComponentPortInfo> PrimitiveOp::getPrimitivePortInfo() {
-    StringAttr name = primitiveNameAttr();
+    StringAttr name = getPrimitiveNameAttr();
     SmallVector<ComponentPortInfo> results;
 
     if (name.getValue() == "register") {
@@ -756,11 +703,11 @@ SmallVector<ComponentPortInfo> PrimitiveOp::getPrimitivePortInfo() {
     return results;
 }
 
-/// Provide meaningful names to the result values of a PrimitiveOp.
+// Provide meaningful names to the result values of a PrimitiveOp.
 void PrimitiveOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
     auto portInfos = getPrimitivePortInfo();
 
-    std::string prefix = instanceName().str() + ".";
+    std::string prefix = getInstanceName().str() + ".";
 
     assert(portInfos.size() == getResults().size() &&
            "# of results must meet the primitive");
@@ -770,67 +717,57 @@ void PrimitiveOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
     }
 }
 
-static LogicalResult verifyPrimitiveOp(PrimitiveOp primitive) {
-    // Verify the referenced primitive component exists.
-    // ComponentOp referencedComponent = instance.getReferencedComponent();
-    // if (!referencedComponent)
-    //   return instance.emitOpError()
-    //          << "is referencing component: " << instance.componentName()
-    //          << ", which does not exist.";
+// LogicalResult PrimitiveOp::verify(PrimitiveOp primitive) {
+//     // Verify the referenced primitive component exists.
+//     // ComponentOp referencedComponent = instance.getReferencedComponent();
+//     // if (!referencedComponent)
+//     //   return instance.emitOpError()
+//     //          << "is referencing component: " << instance.componentName()
+//     //          << ", which does not exist.";
 
-    // Verify the instance result ports with those of its referenced component.
-    // SmallVector<ComponentPortInfo> componentPorts =
-    //     getComponentPortInfo(referencedComponent);
+//     // Verify the instance result ports with those of its referenced component.
+//     // SmallVector<ComponentPortInfo> componentPorts =
+//     //     getComponentPortInfo(referencedComponent);
 
-    // size_t numResults = instance.getNumResults();
-    // if (numResults != componentPorts.size())
-    //   return instance.emitOpError()
-    //          << "has a wrong number of results; expected: "
-    //          << componentPorts.size() << " but got " << numResults;
+//     // size_t numResults = instance.getNumResults();
+//     // if (numResults != componentPorts.size())
+//     //   return instance.emitOpError()
+//     //          << "has a wrong number of results; expected: "
+//     //          << componentPorts.size() << " but got " << numResults;
 
-    // for (size_t i = 0; i != numResults; ++i)
-    // {
-    //   auto resultType = instance.getResult(i).getType();
-    //   auto expectedType = componentPorts[i].type;
-    //   if (resultType == expectedType)
-    //     continue;
-    //   return instance.emitOpError()
-    //          << "result type for " << componentPorts[i].name << " must be "
-    //          << expectedType << ", but got " << resultType;
-    // }
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// StateSetOp
-//===----------------------------------------------------------------------===//
-static LogicalResult verifyStateSetOp(StateSetOp stateset) {
-    // auto component = stateset->getParentOfType<ComponentOp>();
-
-    // TODO: check states and transitions
-
-    return success();
-}
+//     // for (size_t i = 0; i != numResults; ++i)
+//     // {
+//     //   auto resultType = instance.getResult(i).getType();
+//     //   auto expectedType = componentPorts[i].type;
+//     //   if (resultType == expectedType)
+//     //     continue;
+//     //   return instance.emitOpError()
+//     //          << "result type for " << componentPorts[i].name << " must be "
+//     //          << expectedType << ", but got " << resultType;
+//     // }
+//     return success();
+// }
 
 //===----------------------------------------------------------------------===//
 // StateOp
 //===----------------------------------------------------------------------===//
-static void printStateOp(OpAsmPrinter &p, StateOp &op) {
+void StateOp::print(OpAsmPrinter &p) {
     auto stateName =
-            op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+            (*this)->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
                     .getValue();
-    p << "hec.state ";
+    // p << "hec.state ";
+    p << " ";
     p.printSymbolName(stateName);
 
-    if (op.initial())
+    if (this->getInitial())
         p << "*";
 
-    p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+    p.printRegion(this->getBody(), /*printEntryBlockArgs=*/false,
             /*printBlockTerminators=*/true,
             /*printEmptyBlock=*/false);
 }
 
-static ParseResult parseStateOp(OpAsmParser &parser, OperationState &result) {
+ParseResult StateOp::parse(OpAsmParser &parser, OperationState &result) {
     // using namespace mlir::function_like_impl;
 
     StringAttr stateName;
@@ -857,11 +794,6 @@ static ParseResult parseStateOp(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static LogicalResult verifyStateOp(StateOp op) {
-    // TODO: Verify there exists a initial state
-    return success();
-}
-
 void StateOp::build(OpBuilder &builder, OperationState &result, StringAttr name,
                     IntegerAttr initial) {
     // using namespace mlir::function_like_impl;
@@ -877,73 +809,24 @@ void StateOp::build(OpBuilder &builder, OperationState &result, StringAttr name,
     regionBody->push_back(block);
 }
 
-//===----------------------------------------------------------------------===//
-// TransitionOp
-//===----------------------------------------------------------------------===//
+// //===----------------------------------------------------------------------===//
+// // StageOp
+// //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyTransitionOp(TransitionOp transition) {
-    // TODO: check the if-elif-elif-...-else style.
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// GotoOp
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyGotoOp(GotoOp gotoop) {
-    // TODO: check the dest is in the stateset
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// CDoneOp
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyCDoneOp(CDoneOp done) {
-    // TODO: arguments must be consistent with component's out-ports
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// DoneOp
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyDoneOp(DoneOp done) {
-    // TODO: arguments must be consistent with component's out-ports
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// GraphOp
-//===----------------------------------------------------------------------===//
-static LogicalResult verifyGraphOp(GraphOp graph) {
-    // TODO: check handshake linkage behaviors
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// StageSetOp
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyStageSetOp(StageSetOp stageset) { return success(); }
-
-//===----------------------------------------------------------------------===//
-// StageOp
-//===----------------------------------------------------------------------===//
-
-static void printStageOp(OpAsmPrinter &p, StageOp &op) {
+void StageOp::print(OpAsmPrinter &p) {
     auto stageName =
-            op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+            (*this)->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
                     .getValue();
-    p << "hec.stage ";
+    // p << "hec.stage ";
+    p << " ";
     p.printSymbolName(stageName);
 
-    p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+    p.printRegion(this->getBody(), /*printEntryBlockArgs=*/false,
             /*printBlockTerminators=*/true,
             /*printEmptyBlock=*/false);
 }
 
-static ParseResult parseStageOp(OpAsmParser &parser, OperationState &result) {
+ParseResult StageOp::parse(OpAsmParser &parser, OperationState &result) {
     // using namespace mlir::function_like_impl;
 
     StringAttr stageName;
@@ -959,8 +842,6 @@ static ParseResult parseStageOp(OpAsmParser &parser, OperationState &result) {
         body->push_back(new Block());
     return success();
 }
-
-static LogicalResult verifyStageOp(StageOp stage) { return success(); }
 
 void StageOp::build(OpBuilder &builder, OperationState &result,
                     StringAttr name) {

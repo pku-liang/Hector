@@ -1,11 +1,11 @@
 #include "TOR/PassDetail.h"
-#include "mlir/Analysis/Utils.h"
+// #include "mlir/Analysis/Utils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "TOR/TOR.h"
 #include "TOR/TORDialect.h"
 
@@ -17,7 +17,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include <mlir/Transforms/DialectConversion.h>
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/Utils.h"
+// #include "mlir/Transforms/Utils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <map>
@@ -30,6 +30,7 @@
 
 #define DEBUG_TYPE "split-schedule"
 using std::string;
+using namespace mlir::arith;
 namespace mlir {
     namespace split {
 #define TIME_NODE 1005
@@ -137,17 +138,17 @@ namespace mlir {
                 bool foundStatic = false;
                 bool foundDynamic = false;
                 bool foundPipeline = false;
-                START = timeGraphOp.starttime();
-                END = timeGraphOp.endtime();
+                START = timeGraphOp.getStarttime();
+                END = timeGraphOp.getEndtime();
                 MAX_INDEX = std::max(START, END);
-                for (auto &block : timeGraphOp.region()) {
+                for (auto &block : timeGraphOp.getRegion()) {
                     for (auto &op : block) {
                         op.dump();
                         if (auto succ = dyn_cast<tor::SuccTimeOp>(op)) {
-                            MAX_INDEX = std::max(MAX_INDEX, succ.time());
-                            for (unsigned i = 0; i < succ.points().size(); i++) {
-                                auto from = succ.points()[i];
-                                auto comp_edge = succ.edges()[i].cast<DictionaryAttr>();
+                            MAX_INDEX = std::max(MAX_INDEX, succ.getTime());
+                            for (unsigned i = 0; i < succ.getPoints().size(); i++) {
+                                auto from = succ.getPoints()[i];
+                                auto comp_edge = succ.getEdges()[i].cast<DictionaryAttr>();
                                 bool pipeline = comp_edge.get("pipeline").operator bool();
                                 if (pipeline) {
                                     succ->dump();
@@ -159,21 +160,21 @@ namespace mlir {
                                 if (info.find("dynamic") != StringRef::npos) {
                                     foundDynamic = true;
                                     timeGraph[index].push_back(
-                                            TimeEdge(index, succ.time(), succ.edges()[i], false,
+                                            TimeEdge(index, succ.getTime(), succ.getEdges()[i], false,
                                                      info.find("for") != StringRef::npos ||
                                                      info.find("while") != StringRef::npos, pipeline));
                                 } else if (info.find("static") != StringRef::npos) {
                                     foundStatic = true;
                                     timeGraph[index].push_back(
-                                            TimeEdge(index, succ.time(), succ.edges()[i], true,
+                                            TimeEdge(index, succ.getTime(), succ.getEdges()[i], true,
                                                      info.find("for") != StringRef::npos ||
                                                      info.find("while") != StringRef::npos, pipeline));
                                 } else {
                                     edge_info.dump();
                                     assert("Unexpected edge_info attribute" && false);
                                 }
-                                std::cerr << "???" << succ.time() << std::endl;
-                                succOp[succ.time()] = &op;
+                                std::cerr << "???" << succ.getTime() << std::endl;
+                                succOp[succ.getTime()] = &op;
                             }
                         }
                     }
@@ -201,7 +202,7 @@ namespace mlir {
                 funcOp.walk([&](Operation *op) {
 #define BIND(OpType)                   \
 if (auto sop = dyn_cast<OpType>(op)) \
-bind_operation(sop.starttime(), sop.endtime(), op);
+bind_operation(sop.getStarttime(), sop.getEndtime(), op);
                     BIND(tor::AddIOp)
                     BIND(tor::SubIOp)
                     BIND(tor::MulIOp)
@@ -217,18 +218,18 @@ bind_operation(sop.starttime(), sop.endtime(), op);
 //                    BIND(tor::ForOp)
 #undef BIND
                     if (auto ifop = dyn_cast<tor::IfOp>(op)) {
-                        ifEnd[ifop.starttime()] = ifop.endtime();
-                        ifBegin[ifop.endtime()] = ifop.starttime();
-                        ifOp[ifop.starttime()] = op;
+                        ifEnd[ifop.getStarttime()] = ifop.getEndtime();
+                        ifBegin[ifop.getEndtime()] = ifop.getStarttime();
+                        ifOp[ifop.getStarttime()] = op;
                     } else if (auto whileop = dyn_cast<tor::WhileOp>(op)) {
-                        whileEnd[whileop.starttime()] = whileop.endtime();
-                        whileBegin[whileop.endtime()] = whileop.starttime();
-                        whileOp[whileop.starttime()] = op;
+                        whileEnd[whileop.getStarttime()] = whileop.getEndtime();
+                        whileBegin[whileop.getEndtime()] = whileop.getStarttime();
+                        whileOp[whileop.getStarttime()] = op;
                     } else if (auto forop = dyn_cast<tor::ForOp>(op)) {
-                        forEnd[forop.starttime()] = forop.endtime();
-                        forBegin[forop.endtime()] = forop.starttime();
-                        forOp[forop.starttime()] = op;
-//                        std::cerr << ":," << forop.starttime() << forop.endtime() << std::endl;
+                        forEnd[forop.getStarttime()] = forop.getEndtime();
+                        forBegin[forop.getEndtime()] = forop.getStarttime();
+                        forOp[forop.getStarttime()] = op;
+//                        std::cerr << ":," << forop.getStarttime() << forop.getEndtime() << std::endl;
                     }
                 });
 //                exit(0);
@@ -409,16 +410,16 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                             argValues.push_back(val.val);
                             argNum[val] = arg_count++;
                         };
-                        liveins.insert(forOp.lowerBound());
-                        liveins.insert(forOp.upperBound());
-                        liveins.insert(forOp.step());
-                        insertArg(Liveness(forOp.lowerBound()));
-                        insertArg(Liveness(forOp.upperBound()));
-                        insertArg(Liveness(forOp.step()));
+                        liveins.insert(forOp.getLowerBound());
+                        liveins.insert(forOp.getUpperBound());
+                        liveins.insert(forOp.getStep());
+                        insertArg(Liveness(forOp.getLowerBound()));
+                        insertArg(Liveness(forOp.getUpperBound()));
+                        insertArg(Liveness(forOp.getStep()));
                         for (auto val : liveins) {
-                            if (val == forOp.lowerBound())continue;
-                            if (val == forOp.upperBound())continue;
-                            if (val == forOp.step())continue;
+                            if (val == forOp.getLowerBound())continue;
+                            if (val == forOp.getUpperBound())continue;
+                            if (val == forOp.getStep())continue;
                             std::cerr << "Result :";// << val.second << ":";
                             insertArg(val);
                         }
@@ -450,7 +451,8 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                     auto out_func = rewriter.create<tor::FuncOp>(funcOp.getLoc(), func_name, func_type);
                     out_func->setAttr("dump", StringAttr::get(getContext(), get_new_attr().c_str()));
                     out_func->setAttr("strategy", StringAttr::get(getContext(), "static"));
-                    rewriter.createBlock(&(out_func.getBody()), {}, argTypes);
+                    SmallVector<Location, 8> locations(argTypes.size(), funcOp.getLoc());
+                    rewriter.createBlock(&(out_func.getBody()), {}, argTypes, locations);
 
                     std::cerr << "------NEW FUNC-------" << std::endl;
 
@@ -499,7 +501,7 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                                                                 ValueRange(argValues));
                     callOp->setAttr("dump", StringAttr::get(getContext(), get_call_attr().c_str()));                    std::cerr << "------NEW CALL-------" << std::endl;
 
-                    rewriter.setInsertionPointToEnd(out_func.getBodyBlock());
+                    rewriter.setInsertionPointToEnd(&(out_func.getBody().front()));
                     visitOperation(start, [&](Operation *op) {
                         auto newOp = rewriter.clone(*op);
 
@@ -583,9 +585,9 @@ bind_operation(sop.starttime(), sop.endtime(), op);
 
                     std::cerr << "-------RETURN--------" << std::endl;
 
-                    rewriter.setInsertionPointToStart(out_func.getBodyBlock());
+                    rewriter.setInsertionPointToStart(&(out_func.getBody().front()));
                     auto new_timegraph = rewriter.create<tor::TimeGraphOp>(out_func.getLoc(), start, end);
-                    rewriter.createBlock(&(new_timegraph.region()));
+                    rewriter.createBlock(&(new_timegraph.getRegion()));
                     rewriter.setInsertionPointToStart(new_timegraph.getBody());
 //                    rewriter.create<tor::StartTimeOp>(out_func.getLoc(), start);
                     eraseEdges.clear();
@@ -610,10 +612,10 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                         auto succ = cast<tor::SuccTimeOp>(succOp[edge->to]);
                         std::vector<Attribute> edge_array;
                         std::vector<Attribute> node_array;
-                        for (size_t j = 0; j < succ.points().size(); j++) {
-                            if (succ.points()[j].cast<IntegerAttr>().getInt() != edge->from) {
-                                edge_array.push_back(succ.edges()[j]);
-                                node_array.push_back(succ.points()[j]);
+                        for (size_t j = 0; j < succ.getPoints().size(); j++) {
+                            if (succ.getPoints()[j].cast<IntegerAttr>().getInt() != edge->from) {
+                                edge_array.push_back(succ.getEdges()[j]);
+                                node_array.push_back(succ.getPoints()[j]);
                             }
                         }
                         if (node_array.empty()) {
@@ -621,8 +623,8 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                             succOp[edge->to] = NULL;
                             return;
                         }
-                        succ.edgesAttr(ArrayAttr::get(getContext(), edge_array));
-                        succ.pointsAttr(ArrayAttr::get(getContext(), node_array));
+                        succ.setEdgesAttr(ArrayAttr::get(getContext(), edge_array));
+                        succ.setPointsAttr(ArrayAttr::get(getContext(), node_array));
                     };
 
                     for (auto &edge : eraseEdges) {
@@ -646,7 +648,7 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                             mlir::IntegerType::get(getContext(), 32, mlir::IntegerType::Signless),
                             start));
                     llvm::SmallVector<NamedAttribute, 8> dict_attr;
-                    dict_attr.push_back(std::make_pair(Identifier::get("type", getContext()),
+                    dict_attr.push_back(NamedAttribute(StringAttr::get(getContext(), "type"),
                                                        StringAttr::get(getContext(), "static-call")));
                     new_attr.push_back(DictionaryAttr::get(getContext(), dict_attr));
                     rewriter.setInsertionPoint(succOp[end]);
@@ -661,7 +663,7 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                     if (pipe) {
                         out_func->setAttr("pipeline", StringAttr::get(getContext(), "for"));
                         Operation *forOp;
-                        for (auto &sop : *out_func.getBodyBlock()) {
+                        for (auto &sop : out_func.getBody().front()) {
                             if (isa<tor::ForOp>(sop)) {
                                 forOp = &sop;
                             }
@@ -770,8 +772,8 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                   if (!edge.Static) {
                   auto succ = cast<tor::SuccTimeOp>(succOp[edge.to]);
                   std::vector<Attribute> edge_array;
-                  for (size_t j = 0; j < succ.points().size(); j++) {
-                  if (succ.points()[j].cast<IntegerAttr>().getInt() == i) {
+                  for (size_t j = 0; j < succ.getPoints().size(); j++) {
+                  if (succ.getPoints()[j].cast<IntegerAttr>().getInt() == i) {
                   std::vector<NamedAttribute> dict;
                   for (auto entry : succ.edgesAttr()[j].cast<DictionaryAttr>()) {
                   if (entry.first.str() != "type") {
@@ -784,7 +786,7 @@ bind_operation(sop.starttime(), sop.endtime(), op);
                   auto new_dict = DictionaryAttr::get(getContext(), dict);
                   edge_array.push_back(new_dict);
                   } else {
-                  edge_array.push_back(succ.edges()[j]);
+                  edge_array.push_back(succ.getEdges()[j]);
                   }
                   }
                   auto array = ArrayAttr::get(getContext(), edge_array);

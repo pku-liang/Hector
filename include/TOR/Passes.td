@@ -4,16 +4,16 @@
 include "mlir/Pass/PassBase.td"
 
 def TORSchedule : Pass<"schedule-tor", "mlir::tor::DesignOp"> {
-  let summary = "Lower std+scf+affine to tor, schedule a  time graph";
+  let summary = "Lower std+scf+affine to tor, schedule a time graph";
   let constructor = "mlir::createTORSchedulePass()";
   let dependentDialects = ["mlir::tor::TORDialect"];
 }
 
-def TORPipelinePartition : Pass<"pipeline-partition", "mlir::ModuleOp"> {
-  let summary = "Partition on time graph in a pipelined structure";
-  let constructor = "mlir::createTORPipelinePartitionPass()";
-  let dependentDialects = ["mlir::tor::TORDialect"];
-}
+// def TORPipelinePartition : Pass<"pipeline-partition", "mlir::ModuleOp"> {
+//   let summary = "Partition on time graph in a pipelined structure";
+//   let constructor = "mlir::createTORPipelinePartitionPass()";
+//   let dependentDialects = ["mlir::tor::TORDialect"];
+// }
 
 def TORSplit : Pass<"split-schedule", "mlir::ModuleOp"> {
   let summary = "Split mixed scheduling modules";
@@ -21,11 +21,11 @@ def TORSplit : Pass<"split-schedule", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::tor::TORDialect"];
 }
 
-def TORCheck : Pass<"check-schedule", "mlir::ModuleOp"> {
-  let summary = "Check scheduling modules";
-  let constructor = "mlir::createTORCheckPass()";
-  let dependentDialects = ["mlir::tor::TORDialect"];
-}
+// def TORCheck : Pass<"check-schedule", "mlir::ModuleOp"> {
+//   let summary = "Check scheduling modules";
+//   let constructor = "mlir::createTORCheckPass()";
+//   let dependentDialects = ["mlir::tor::TORDialect"];
+// }
 
 def SCFToTOR : Pass<"scf-to-tor", "mlir::tor::DesignOp"> {
   let summary = "Convert SCF to unscheduled TOR";
@@ -45,10 +45,10 @@ def TORDump : Pass<"dump-tor", "mlir::tor::DesignOp"> {
   let dependentDialects = ["mlir::tor::TORDialect"];
 }
 
-def WidthAnalysis : Pass<"width-analysis", "mlir::tor::DesignOp"> {
-  let summary = "bitwidth analysis and reduction";
-  let constructor = "mlir::createWidthAnalysisPass()";
-  let dependentDialects = ["mlir::tor::TORDialect"];
-}
+// def WidthAnalysis : Pass<"width-analysis", "mlir::tor::DesignOp"> {
+//   let summary = "bitwidth analysis and reduction";
+//   let constructor = "mlir::createWidthAnalysisPass()";
+//   let dependentDialects = ["mlir::tor::TORDialect"];
+// }
 
 #endif // TOR_PASSES

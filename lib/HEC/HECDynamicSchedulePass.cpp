@@ -1,12 +1,12 @@
 #include "HEC/PassDetail.h"
-#include "mlir/Analysis/Utils.h"
+// #include "mlir/Analysis/Utils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "TOR/TOR.h"
 #include "TOR/TORDialect.h"
 #include "HEC/HEC.h"
@@ -20,7 +20,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include <mlir/Transforms/DialectConversion.h>
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/Utils.h"
+// #include "mlir/Transforms/Utils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Analysis/Liveness.h"
 
@@ -33,6 +33,7 @@
 #include <functional>
 
 #define DEBUG_TYPE "dynamic-schedule"
+using namespace mlir::arith;
 
 namespace mlir {
     namespace dynamic {
@@ -177,10 +178,10 @@ namespace mlir {
                         }
                     }
                 }
-                LIVE_INSERT(forOp.lowerBound());
-                LIVE_INSERT(forOp.upperBound());
-                LIVE_INSERT(forOp.step());
-                for (auto init : forOp.initArgs()) {
+                LIVE_INSERT(forOp.getLowerBound());
+                LIVE_INSERT(forOp.getUpperBound());
+                LIVE_INSERT(forOp.getStep());
+                for (auto init : forOp.getInitArgs()) {
                     LIVE_INSERT(init);
                 }
 
@@ -205,7 +206,7 @@ namespace mlir {
                         collect_ops.insert(&op);
                     }
                 }
-                LIVE_INSERT(ifOp.condition());
+                LIVE_INSERT(ifOp.getCondition());
                 bool flag = false;
                 for (unsigned idx = 0; idx < ifOp->getNumRegions(); ++idx) {
                     if (ifOp.getRegion(idx).empty()) {
@@ -442,8 +443,8 @@ namespace mlir {
                 branch_set.resize(forOp.getBody()->getNumArguments());
                 hec::PrimitiveOp compare;
                 llvm::SmallVector<mlir::Type, 4> types;
-                types.push_back(forOp.upperBound().getType());
-                types.push_back(forOp.upperBound().getType());
+                types.push_back(forOp.getUpperBound().getType());
+                types.push_back(forOp.getUpperBound().getType());
                 types.push_back(rewriter.getI1Type());
                 compare = create_primitive(forOp.getLoc(), types, "cmp_integer_sle", "cmpi_sle_",
                                            rewriter);
@@ -503,7 +504,7 @@ namespace mlir {
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), buffer.getResult(0), mux.getResult(2), Value());
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), branch.getResult(0), compare.getResult(2), Value());
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), mux.getResult(0),
-                                                   get_value(forOp, forOp.initArgs()[arg.getArgNumber() - 1], rewriter),
+                                                   get_value(forOp, forOp.getInitArgs()[arg.getArgNumber() - 1], rewriter),
                                                    Value());
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), mux.getResult(3), merge_condition, Value());
                     hec_operation[std::make_pair(forOp, arg)] = branch.getResult(2);
@@ -539,14 +540,14 @@ namespace mlir {
                             LIVE_INSERT(val.val);
                         }
                     }
-                    LIVE_INSERT(forOp.upperBound());
-                    LIVE_INSERT(forOp.step());
+                    LIVE_INSERT(forOp.getUpperBound());
+                    LIVE_INSERT(forOp.getStep());
                 }
 #undef LIVE_INSERT
 //                for (auto val : livein) {
 //                    val.dump();
 //                }
-                auto lowerBound = get_value(forOp, forOp.lowerBound(), rewriter);
+                auto lowerBound = get_value(forOp, forOp.getLowerBound(), rewriter);
                 auto upperBound = Value();
 //                auto step = Value();
                 for (auto val : liveins[forOp]) {
@@ -589,7 +590,7 @@ namespace mlir {
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), mux.getResult(3), merge_condition, Value());
                     hec_operation[std::make_pair(forOp, val)] = branch.getResult(2);
                     //FIXME: data with while and do_while
-                    if (val.val == forOp.upperBound()) {
+                    if (val.val == forOp.getUpperBound()) {
                         upperBound = buffer.getResult(1);
                     }
                 }
@@ -615,13 +616,13 @@ namespace mlir {
                     types.clear();
                     types.push_back(rewriter.getI1Type());
                     for (int loop = 0; loop < 3; ++loop) {
-                        types.push_back(forOp.upperBound().getType());
+                        types.push_back(forOp.getUpperBound().getType());
                     }
                     auto branch = create_primitive(forOp.getLoc(), types, "branch", "b_", rewriter);
                     types.clear();
-                    types.push_back(forOp.upperBound().getType());
+                    types.push_back(forOp.getUpperBound().getType());
                     types.push_back(branch.getResult(2).getType());
-                    types.push_back(forOp.upperBound().getType());
+                    types.push_back(forOp.getUpperBound().getType());
                     auto add = create_primitive(forOp.getLoc(), types, "add_integer", "addi_", rewriter);
                     hec_operation[std::make_pair(forOp, arg)] = branch.getResult(2);
 
@@ -635,7 +636,7 @@ namespace mlir {
                                                    Value());
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), add.getResult(0), branch.getResult(2), Value());
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), add.getResult(1),
-                                                   get_value(forOp, forOp.step(), rewriter), Value());
+                                                   get_value(forOp, forOp.getStep(), rewriter), Value());
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), mux.getResult(1), add.getResult(2), Value());
                     rewriter.create<hec::AssignOp>(forOp.getLoc(), mux.getResult(3), merge_condition, Value());
                 }
@@ -682,7 +683,7 @@ namespace mlir {
                 llvm::SmallVector<Operation *, 4> mux_set;
                 llvm::SmallVector<Operation *, 4> branch_set;
                 for (auto val : liveins[ifOp]) {
-                    if (val && val.val == ifOp.condition()) {
+                    if (val && val.val == ifOp.getCondition()) {
                         continue;
                     }
                     std::cerr << "!!!!!";
@@ -695,7 +696,7 @@ namespace mlir {
                     auto branch = create_primitive(ifOp.getLoc(), types, "branch", "b_", rewriter);
                     branch_set.push_back(branch);
                     rewriter.create<hec::AssignOp>(ifOp.getLoc(), branch->getResult(0),
-                                                   get_value(ifOp, ifOp.condition(), rewriter), Value());
+                                                   get_value(ifOp, ifOp.getCondition(), rewriter), Value());
                     rewriter.create<hec::AssignOp>(ifOp.getLoc(), branch->getResult(1),
                                                    get_value(ifOp, val.val, rewriter), Value());
                 }
@@ -709,12 +710,12 @@ namespace mlir {
                     mux_set.push_back(cmerge);
                     hec_operation[std::make_pair(ifOp, ret)] = cmerge.getResult(2);
                     rewriter.create<hec::AssignOp>(ifOp.getLoc(), cmerge.getResult(3),
-                                                   get_value(ifOp, ifOp.condition(), rewriter), Value());
+                                                   get_value(ifOp, ifOp.getCondition(), rewriter), Value());
                 }
                 for (unsigned idx = 0; idx < ifOp->getNumRegions(); ++idx) {
                     int branch_count = 0;
                     for (auto val : liveins[ifOp]) {
-                        if (val && val.val == ifOp.condition()) {
+                        if (val && val.val == ifOp.getCondition()) {
                             continue;
                         }
                         hec_operation[std::make_pair(ifOp, val.val)] = branch_set[branch_count++]->getResult(idx + 2);
@@ -760,7 +761,7 @@ namespace mlir {
             } else if (auto whileOp = dyn_cast<tor::WhileOp>(op)) {
                 assert(false && "While operation not finished");
             } else if (auto callOp = dyn_cast<tor::CallOp>(op)) {
-                auto callee = callOp.callee();
+                auto callee = callOp.getCallee();
                 std::cerr << callee.str() << std::endl;
                 llvm::SmallVector<mlir::Type, 4> types;
                 for (auto arg : callOp.getArgOperands())
@@ -805,12 +806,12 @@ namespace mlir {
                                                    get_value(callOp, callOp.getArgOperands()[idx], rewriter), Value());
                 }
             } else if (auto loadOp = dyn_cast<tor::LoadOp>(op)) {
-                assert(loadOp.indices().size() == 1 && "Invalid load operation");
+                assert(loadOp.getIndices().size() == 1 && "Invalid load operation");
                 llvm::SmallVector<mlir::Type, 4> types;
-                types.push_back(loadOp.indices()[0].getType());
-                auto allocOp = cast<tor::AllocOp>(loadOp.memref().getDefiningOp());
+                types.push_back(loadOp.getIndices()[0].getType());
+                auto allocOp = cast<tor::AllocOp>(loadOp.getMemref().getDefiningOp());
                 types.push_back(allocOp.getType().getElementType());
-                types.push_back(loadOp.indices()[0].getType());
+                types.push_back(loadOp.getIndices()[0].getType());
                 types.push_back(allocOp.getType().getElementType());
                 types.push_back(rewriter.getIntegerType(1000));
                 auto load = create_primitive(loadOp.getLoc(), types,
@@ -819,11 +820,11 @@ namespace mlir {
                 hec_operation[std::make_pair(loadOp, Liveness(loadOp.getResult()))] = load.getResult(1);
 
                 rewriter.create<hec::AssignOp>(loadOp.getLoc(), load.getResult(0),
-                                               get_value(loadOp, loadOp.indices()[0], rewriter), Value());
+                                               get_value(loadOp, loadOp.getIndices()[0], rewriter), Value());
                 rewriter.create<hec::AssignOp>(loadOp.getLoc(), load.getResult(4),
                                                get_value(loadOp, control_signal, rewriter), Value());
-                auto memOp = memSet[loadOp.memref().getDefiningOp()];
-                auto const &vec = loadSet[loadOp.memref().getDefiningOp()];
+                auto memOp = memSet[loadOp.getMemref().getDefiningOp()];
+                auto const &vec = loadSet[loadOp.getMemref().getDefiningOp()];
                 for (unsigned idx = 0; idx != vec.size(); ++idx) {
                     auto const &op = vec[idx];
                     if (op == loadOp) {
@@ -834,26 +835,26 @@ namespace mlir {
                     }
                 }
             } else if (auto storeOp = dyn_cast<tor::StoreOp>(op)) {
-                assert(storeOp.indices().size() == 1 && "Invalid load operation");
+                assert(storeOp.getIndices().size() == 1 && "Invalid load operation");
                 llvm::SmallVector<mlir::Type, 4> types;
-                types.push_back(storeOp.indices()[0].getType());
-                auto allocOp = cast<tor::AllocOp>(storeOp.memref().getDefiningOp());
+                types.push_back(storeOp.getIndices()[0].getType());
+                auto allocOp = cast<tor::AllocOp>(storeOp.getMemref().getDefiningOp());
                 types.push_back(allocOp.getType().getElementType());
-                types.push_back(storeOp.indices()[0].getType());
+                types.push_back(storeOp.getIndices()[0].getType());
                 types.push_back(allocOp.getType().getElementType());
                 types.push_back(rewriter.getIntegerType(1000));
                 auto store = create_primitive(storeOp.getLoc(), types,
                                               "store#" + std::to_string(allocOp.getType().getShape()[0]), "store_",
                                               rewriter);
                 rewriter.create<hec::AssignOp>(storeOp.getLoc(), store.getResult(0),
-                                               get_value(storeOp, storeOp.indices()[0], rewriter), Value());
+                                               get_value(storeOp, storeOp.getIndices()[0], rewriter), Value());
                 rewriter.create<hec::AssignOp>(storeOp.getLoc(), store.getResult(1),
-                                               get_value(storeOp, storeOp.value(), rewriter), Value());
+                                               get_value(storeOp, storeOp.getValue(), rewriter), Value());
                 rewriter.create<hec::AssignOp>(storeOp.getLoc(), store.getResult(4),
                                                get_value(storeOp, control_signal, rewriter), Value());
-                auto memOp = memSet[storeOp.memref().getDefiningOp()];
-                unsigned loadSize = loadSet[storeOp.memref().getDefiningOp()].size();
-                auto const &vec = storeSet[storeOp.memref().getDefiningOp()];
+                auto memOp = memSet[storeOp.getMemref().getDefiningOp()];
+                unsigned loadSize = loadSet[storeOp.getMemref().getDefiningOp()].size();
+                auto const &vec = storeSet[storeOp.getMemref().getDefiningOp()];
                 for (unsigned idx = 0; idx != vec.size(); ++idx) {
                     auto const &op = vec[idx];
                     if (op == storeOp) {
@@ -890,17 +891,17 @@ namespace mlir {
                 else CREATE_PRIMITIVE(tor::SubFOp, "sub_float", "subf_")
                 else CREATE_PRIMITIVE(tor::MulFOp, "mul_float", "mulf_")
                 else CREATE_PRIMITIVE(tor::DivFOp, "div_float", "divf_")
-                else CREATE_PRIMITIVE(TruncateIOp, "trunc_integer", "trunci_")
+                else CREATE_PRIMITIVE(TruncIOp, "trunc_integer", "trunci_")
                 else CREATE_PRIMITIVE(tor::CmpIOp,
-                                      std::string("cmp_integer_") + tor::stringifyEnum(tor_op.predicate()).str(),
+                                      std::string("cmp_integer_") + tor::stringifyEnum(tor_op.getPredicate()).str(),
                                       "cmpi_")
                 else CREATE_PRIMITIVE(tor::CmpFOp,
-                                      std::string("cmp_float_") + tor::stringifyEnum(tor_op.predicate()).str(),
+                                      std::string("cmp_float_") + tor::stringifyEnum(tor_op.getPredicate()).str(),
                                       "cmpf_")
-                else CREATE_PRIMITIVE(ShiftLeftOp, "shift_left", "shl_")
+                else CREATE_PRIMITIVE(ShLIOp, "shift_left", "shl_")
                 else CREATE_PRIMITIVE(SelectOp, "select", "select_")
                 else CREATE_PRIMITIVE(NegFOp, "neg_float", "negf_")
-                else CREATE_PRIMITIVE(AndOp, "and", "and_")
+                else CREATE_PRIMITIVE(AndIOp, "and", "and_")
                 else CREATE_PRIMITIVE(FPToSIOp, "fptosi", "fptosi_")
                 else {
                     op->dump();
@@ -926,7 +927,7 @@ namespace mlir {
             std::map<Operation *, std::vector<std::pair<Operation *, Operation *>>> graph;
             auto getLatency = [&](Operation *op) {
                 if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {
-                    std::string primName = primitive.primitiveName().str();
+                    std::string primName = primitive.getPrimitiveName().str();
                     if (primName == "mul_float") {
                         return 9;
                     }
@@ -950,9 +951,9 @@ namespace mlir {
             };
 
             std::map<Operation *, int> time;
-            for (auto &op : *(component.getBody())) {
+            for (auto &op : component.getBody().front()) {
                 if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {
-                    std::string primName = primitive.primitiveName().str();
+                    std::string primName = primitive.getPrimitiveName().str();
                     if (primName == "mux_dynamic" || primName == "control_merge") {
                         time[primitive] = 0;
                     } else if (primName.find("dyn_Mem") != std::string::npos) {
@@ -964,14 +965,14 @@ namespace mlir {
                     time[instance] = -1;
                 }
             }
-            for (auto &op : *(component.getGraphOp().getBody())) {
+            for (auto &op : component.getGraphOp().getBody().front()) {
                 if (auto assignOp = dyn_cast<hec::AssignOp>(op)) {
-                    if (assignOp.src().isa<BlockArgument>()) {
-                        time[assignOp.dest().getDefiningOp()] = 0;
+                    if (assignOp.getSrc().isa<BlockArgument>()) {
+                        time[assignOp.getDest().getDefiningOp()] = 0;
                         continue;
                     }
-                    auto src = assignOp.src();
-                    auto dest = assignOp.dest();
+                    auto src = assignOp.getSrc();
+                    auto dest = assignOp.getDest();
                     graph[dest.getDefiningOp()].push_back(std::make_pair(src.getDefiningOp(), &op));
                 }
             }
@@ -994,15 +995,15 @@ namespace mlir {
                     continue;
                 }
                 pair.first->dump();
-                int start = end - getLatency(pair.first);
+                // int start = end - getLatency(pair.first);
                 for (auto pred : graph[pair.first]) {
                     int temp = end - time[pred.first];
                     if (temp != 0) {
                         auto assignOp = cast<hec::AssignOp>(pred.second);
                         std::cerr << temp;
                         assignOp.dump();
-                        auto src = assignOp.src();
-                        auto dest = assignOp.dest();
+                        auto src = assignOp.getSrc();
+                        auto dest = assignOp.getDest();
                         llvm::SmallVector<mlir::Type, 4> types;
                         types.push_back(src.getType());
                         types.push_back(dest.getType());
@@ -1018,11 +1019,11 @@ namespace mlir {
 //            exit(-1);
 //            for (auto &op : *(component.getGraphOp().getBody())) {
 //                if (auto primitive = dyn_cast<hec::AssignOp>(op)) {
-//                    if (primitive.src().isa<BlockArgument>()) {
+//                    if (primitive.getSrc().isa<BlockArgument>()) {
 //                        continue;
 //                    }
-//                    graph[primitive.dest().getDefiningOp()].push_back(primitive.src().getDefiningOp());
-//                    rev_graph[primitive.src().getDefiningOp()].push_back(primitive.dest().getDefiningOp());
+//                    graph[primitive.getDest().getDefiningOp()].push_back(primitive.getSrc().getDefiningOp());
+//                    rev_graph[primitive.getSrc().getDefiningOp()].push_back(primitive.getDest().getDefiningOp());
 //                }
 //            }
 
@@ -1034,7 +1035,7 @@ namespace mlir {
             llvm::SmallVector<mlir::hec::ComponentPortInfo, 16> ports;
             mlir::StringAttr interfc = mlir::StringAttr::get(context, "wrapped");
             mlir::StringAttr style = mlir::StringAttr::get(context, "handshake");
-            auto funcType = funcOp.getType();
+            auto funcType = funcOp.getFunctionType();
 //            auto funcArgs = funcOp.getArguments();
             size_t icount = 0;
             for (auto inPort : funcType.getInputs()) {
@@ -1070,13 +1071,13 @@ namespace mlir {
                                                    hec::PortDirection::OUTPUT));
             auto component = rewriter.create<hec::ComponentOp>(funcOp.getLoc(), name, ports, interfc, style);
             TopComp = &component;
-            if (component.getGraphOp().body().empty())
-                component.getGraphOp().body().push_back(new mlir::Block);
+            if (component.getGraphOp().getBody().empty())
+                component.getGraphOp().getBody().push_back(new mlir::Block);
             for (unsigned idx = 0; idx != funcOp.getNumArguments(); ++idx) {
                 hec_operation[std::make_pair(funcOp, funcOp.getArgument(idx))] = component.getArgument(idx);
             }
             hec_operation[std::make_pair(funcOp, control_signal)] = component.getArgument(funcOp.getNumArguments());
-            rewriter.setInsertionPointToStart(component.getBody());
+            rewriter.setInsertionPointToStart(&(component.getBody().front()));
 
             std::cerr << "-----Memory op--------\n";
             //FIXME : How to deal with complex dependence for memory operation
@@ -1088,12 +1089,12 @@ namespace mlir {
                 llvm::SmallVector<mlir::Type, 4> types;
                 std::string memInfo = "";
                 for (auto const &loadOp : loadSet[pair.first]) {
-                    types.push_back(cast<tor::LoadOp>(loadOp).indices()[0].getType());
+                    types.push_back(cast<tor::LoadOp>(loadOp).getIndices()[0].getType());
                     types.push_back(cast<tor::AllocOp>(pair.first).getType().getElementType());
                     memInfo = "#" + std::to_string(cast<tor::AllocOp>(pair.first).getType().getShape()[0]);
                 }
                 for (auto const &storeOp : storeSet[pair.first]) {
-                    types.push_back(cast<tor::StoreOp>(storeOp).indices()[0].getType());
+                    types.push_back(cast<tor::StoreOp>(storeOp).getIndices()[0].getType());
                     types.push_back(cast<tor::AllocOp>(pair.first).getType().getElementType());
                     memInfo = "#" + std::to_string(cast<tor::AllocOp>(pair.first).getType().getShape()[0]);
                 }
@@ -1107,7 +1108,7 @@ namespace mlir {
 //            for (auto val : liveins[funcOp]) {
 //
 //            }
-            rewriter.setInsertionPointToEnd(&(component.getGraphOp().body().front()));
+            rewriter.setInsertionPointToEnd(&(component.getGraphOp().getBody().front()));
             for (auto &op : funcOp.getRegion().front()) {
                 if (isa<tor::TimeGraphOp, tor::ReturnOp>(op)) {
                     continue;
@@ -1131,17 +1132,17 @@ namespace mlir {
                     }
                 }
             }
-            auto returnOp = funcOp.getBodyBlock()->getTerminator();
+            auto returnOp = funcOp.getBody().front().getTerminator();
             for (unsigned idx = 0; idx < returnOp->getNumOperands(); ++idx) {
                 auto ret = returnOp->getOperand(idx);
 //                ret.dump();
                 rewriter.create<hec::AssignOp>(funcOp.getLoc(),
-                                               component.getArgument(component.numInPorts() + idx),
+                                               component.getArgument(component.getNumInPorts() + idx),
                                                get_value(funcOp, ret, rewriter), Value());
             }
 //            component->dump();
 //            exit(-1);
-            for (auto &op : *(component.getBody())) {
+            for (auto &op : component.getBody().front()) {
                 if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {
                     auto portInfo = primitive.getPrimitivePortInfo();
                     for (unsigned idx = 0; idx < portInfo.size(); ++idx) {
@@ -1151,14 +1152,14 @@ namespace mlir {
                             int use_count = 0;
                             for (auto &bval : port.getUses()) {
                                 if (auto assign = dyn_cast<hec::AssignOp>(bval.getOwner())) {
-                                    if (assign.src() == port) {
+                                    if (assign.getSrc() == port) {
                                         assign_set.push_back(assign);
                                         ++use_count;
                                     }
                                 }
                             }
                             if (use_count > 1) {
-//                                std::cerr << primitive.primitiveName().str() << "?";
+//                                std::cerr << primitive.getPrimitiveName().str() << "?";
 //                                primitive.dump();
 //                                std::cerr << portInfo[idx].name.getValue().str() << ":";
 //                                port.dump();
@@ -1175,7 +1176,7 @@ namespace mlir {
                                 rewriter.create<hec::AssignOp>(funcOp.getLoc(), fork->getResult(0),
                                                                port, Value());
                             } else if (use_count == 0) {
-//                                std::cerr << primitive.primitiveName().str() << "SINK";
+//                                std::cerr << primitive.getPrimitiveName().str() << "SINK";
 //                                primitive.dump();
 //                                std::cerr << portInfo[idx].name.getValue().str() << ":";
 //                                port.dump();
@@ -1220,11 +1221,11 @@ namespace mlir {
             }
             if (!found) {
                 hecDesign = rewriter.create<hec::DesignOp>(funcOp.getLoc(),
-                                                           cast<tor::DesignOp>(funcOp->getParentOp()).symbol());
+                                                           cast<tor::DesignOp>(funcOp->getParentOp()).getSymbol());
             }
-            if (hecDesign.body().empty())
-                hecDesign.body().push_back(new mlir::Block);
-            rewriter.setInsertionPointToStart(hecDesign.getBody());
+            if (hecDesign.getBody().empty())
+                hecDesign.getBody().push_back(new mlir::Block);
+            rewriter.setInsertionPointToStart(&(hecDesign.getBody().front()));
 
             for (auto &op : (funcOp->getParentOp())->getRegion(0).front()) {
                 if (auto constant = dyn_cast<ConstantOp>(op)) {
@@ -1234,7 +1235,7 @@ namespace mlir {
                 }
             }
             control_signal = Value();
-            rewriter.setInsertionPointToEnd(hecDesign.getBody());
+            rewriter.setInsertionPointToEnd(&(hecDesign.getBody().front()));
             Generate_operation(funcOp, rewriter);
 
 //            funcOp->getParentOp()->getParentOp()->dump();
@@ -1247,7 +1248,7 @@ namespace mlir {
             matchAndRewrite(tor::DesignOp designOp, PatternRewriter &rewriter) const override {
                 instanceCounts.clear();
                 tor::FuncOp funcOp;
-                for (auto &op : *(designOp.getBody())) {
+                for (auto &op : designOp.getBody().front()) {
                     if (auto sop = dyn_cast<tor::FuncOp>(op)) {
                         if (sop.getName() == "main") {
                             funcOp = sop;
@@ -1278,11 +1279,11 @@ namespace mlir {
                 std::cerr << "---Memory  analysis---\n";
                 funcOp.walk([&](Operation *op) {
                     if (auto loadOp = dyn_cast<tor::LoadOp>(op)) {
-                        auto memref = loadOp.memref();
+                        auto memref = loadOp.getMemref();
                         loadSet[memref.getDefiningOp()].push_back(loadOp);
                         loadstoreSet[memref.getDefiningOp()].push_back(loadOp);
                     } else if (auto storeOp = dyn_cast<tor::StoreOp>(op)) {
-                        auto memref = storeOp.memref();
+                        auto memref = storeOp.getMemref();
                         storeSet[memref.getDefiningOp()].push_back(storeOp);
                         loadstoreSet[memref.getDefiningOp()].push_back(storeOp);
                     }
@@ -1305,7 +1306,7 @@ namespace mlir {
 
                 std::cerr << "------Generate--------\n";
                 generate_top(funcOp, rewriter);
-                Operation *torDesign = funcOp->getParentOp();
+                // Operation *torDesign = funcOp->getParentOp();
                 rewriter.eraseOp(designOp);
 //                rewriter.eraseOp(funcOp);
 

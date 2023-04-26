@@ -1,4 +1,4 @@
-def AddIOp : TOROp<"addi", [NoSideEffect]> {
+def AddIOp : TOROp<"addi", [Pure]> {
   let summary = "addi operation";
   let description = [{
     The "addi" operation represents the addition of two variables.
@@ -11,13 +11,12 @@ def AddIOp : TOROp<"addi", [NoSideEffect]> {
   let assemblyFormat = [{$lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` `(` type($lhs) `,` type($rhs) `)` `->` type($result)
   }];
-  let verifier = ?;
   let builders = [
     OpBuilder<(ins "Value" : $lhs, "Value" : $rhs)>];
 
 }
 
-def SubIOp : TOROp<"subi", [NoSideEffect]> {
+def SubIOp : TOROp<"subi", [Pure]> {
   let summary = "subi operation";
   let description = [{
     The "subi" operation represents the substraction of two variables.
@@ -30,13 +29,12 @@ def SubIOp : TOROp<"subi", [NoSideEffect]> {
   let assemblyFormat = [{$lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` `(` type($lhs) `,` type($rhs) `)` `->` type($result)
   }];
-  let verifier = ?;
   let builders = [
     OpBuilder<(ins "Value" : $lhs, "Value" : $rhs)>];
 
 }
 
-def MulIOp : TOROp<"muli", [NoSideEffect]> {
+def MulIOp : TOROp<"muli", [Pure]> {
   let summary = "muli operation";
   let description = [{
     The "muli" operation represents the mulplication of two variables.
@@ -49,13 +47,12 @@ def MulIOp : TOROp<"muli", [NoSideEffect]> {
   let assemblyFormat = [{$lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` `(` type($lhs) `,` type($rhs) `)` `->` type($result)
   }];
-  let verifier = ?;
   let builders = [
     OpBuilder<(ins "Value" : $lhs, "Value" : $rhs)>];
 
 }
 
-def AddFOp : TOROp<"addf", [NoSideEffect, SameTypeOperands, 
+def AddFOp : TOROp<"addf", [Pure, 
                            SameOperandsAndResultType]> {
   let summary = "addf operation";
   let description = [{
@@ -69,7 +66,6 @@ def AddFOp : TOROp<"addf", [NoSideEffect, SameTypeOperands,
   let assemblyFormat = [{$lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` type($result)
   }];
-  let verifier = ?;
   let builders = [
     OpBuilder<(ins "Value" : $lhs, "Value" : $rhs), [{
       return build($_builder, $_state, lhs.getType(), ValueRange{lhs, rhs},
@@ -78,7 +74,7 @@ def AddFOp : TOROp<"addf", [NoSideEffect, SameTypeOperands,
 
 }
 
-def SubFOp : TOROp<"subf", [NoSideEffect, SameTypeOperands, 
+def SubFOp : TOROp<"subf", [Pure, 
                            SameOperandsAndResultType]> {
   let summary = "subf operation";
   let description = [{
@@ -92,7 +88,6 @@ def SubFOp : TOROp<"subf", [NoSideEffect, SameTypeOperands,
   let assemblyFormat = [{$lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` type($result)
   }];
-  let verifier = ?;
   let builders = [
     OpBuilder<(ins "Value" : $lhs, "Value" : $rhs), [{
       return build($_builder, $_state, lhs.getType(), ValueRange{lhs, rhs},
@@ -101,7 +96,7 @@ def SubFOp : TOROp<"subf", [NoSideEffect, SameTypeOperands,
 
 }
 
-def MulFOp : TOROp<"mulf", [NoSideEffect, SameTypeOperands, 
+def MulFOp : TOROp<"mulf", [Pure, 
                            SameOperandsAndResultType]> {
   let summary = "mulf operation";
   let description = [{
@@ -115,7 +110,6 @@ def MulFOp : TOROp<"mulf", [NoSideEffect, SameTypeOperands,
   let assemblyFormat = [{$lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` type($result)
   }];
-  let verifier = ?;
   let builders = [
     OpBuilder<(ins "Value" : $lhs, "Value" : $rhs), [{
       return build($_builder, $_state, lhs.getType(), ValueRange{lhs, rhs},
@@ -124,7 +118,7 @@ def MulFOp : TOROp<"mulf", [NoSideEffect, SameTypeOperands,
 
 }
 
-def DivFOp : TOROp<"divf", [NoSideEffect, SameTypeOperands, 
+def DivFOp : TOROp<"divf", [Pure, 
                            SameOperandsAndResultType]> {
   let summary = "divf operation";
   let description = [{
@@ -138,7 +132,6 @@ def DivFOp : TOROp<"divf", [NoSideEffect, SameTypeOperands,
   let assemblyFormat = [{$lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` type($result)
   }];
-  let verifier = ?;
   let builders = [
     OpBuilder<(ins "Value" : $lhs, "Value" : $rhs), [{
       return build($_builder, $_state, lhs.getType(), ValueRange{lhs, rhs},
@@ -179,7 +172,7 @@ def CmpFPredicateAttr : I64EnumAttr<
   let cppNamespace = "::mlir::tor";
 }
 
-def CmpFOp : TOROp<"cmpf", [NoSideEffect, SameTypeOperands]> {
+def CmpFOp : TOROp<"cmpf", [Pure, SameTypeOperands]> {
   let summary = "cmpf operation";
   let description = [{
     The "cmpf" operation represents the comparison of two variables.
@@ -196,7 +189,6 @@ def CmpFOp : TOROp<"cmpf", [NoSideEffect, SameTypeOperands]> {
     $lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` type($lhs) `->` type($result)
   }];
-  let verifier = ?;
 
 }
 
@@ -223,7 +215,7 @@ def CmpIPredicateAttr : I64EnumAttr<
   let cppNamespace = "::mlir::tor";
 }
 
-def CmpIOp : TOROp<"cmpi", [NoSideEffect]> {
+def CmpIOp : TOROp<"cmpi", [Pure]> {
   let summary = "cmpi operation";
   let description = [{
     The "cmpf" operation represents the comparison of two variables.
@@ -240,13 +232,12 @@ def CmpIOp : TOROp<"cmpi", [NoSideEffect]> {
     $lhs $rhs `on` ` ` `(` $starttime `to` $endtime `)` 
     attr-dict `:` `(` type($lhs) `,` type($rhs) `)` `->` type($result)
   }];
-  let verifier = ?;
 
 }
 
 class AllocLikeOp<string mnemonic,
                   Resource resource,
-                  list<OpTrait> traits = []> :
+                  list<Trait> traits = []> :
     TOROp<mnemonic,
     !listconcat([
      /* AttrSizedOperandSegments */
@@ -310,13 +301,13 @@ def LoadOp : TOROp<"load",
     }]>];
 
   let extraClassDeclaration = [{
-    Value getMemRef() { return getOperand(0); }
-    void setMemRef(Value value) { setOperand(0, value); }
-    MemRefType getMemRefType() {
-      return getMemRef().getType().cast<MemRefType>();
-    }
+    // Value getMemRef() { return getOperand(0); }
+    // void setMemRef(Value value) { setOperand(0, value); }
+    // MemRefType getMemRefType() {
+    //   return getMemRef().getType().cast<MemRefType>();
+    // }
 
-    operand_range getIndices() { return {operand_begin() + 1, operand_end()}; }
+    // operand_range getIndices() { return {operand_begin() + 1, operand_end()}; }
   }];
 
   let assemblyFormat = [{$memref `[` $indices `]` `on` ` ` `(` $starttime `to` $endtime `)` 
@@ -354,17 +345,17 @@ def StoreOp : TOROp<"store",
     }]>];
 
   let extraClassDeclaration = [{
-      Value getValueToStore() { return getOperand(0); }
+      // Value getValueToStore() { return getOperand(0); }
 
-      Value getMemRef() { return getOperand(1); }
-      void setMemRef(Value value) { setOperand(1, value); }
-      MemRefType getMemRefType() {
-        return getMemRef().getType().cast<MemRefType>();
-      }
+      // Value getMemRef() { return getOperand(1); }
+      // void setMemRef(Value value) { setOperand(1, value); }
+      // MemRefType getMemRefType() {
+      //   return getMemRef().getType().cast<MemRefType>();
+      // }
 
-      operand_range getIndices() {
-        return {operand_begin() + 2, operand_end()};
-      }
+      // operand_range getIndices() {
+      //   return {operand_begin() + 2, operand_end()};
+      // }
   }];
 
   let assemblyFormat = [{

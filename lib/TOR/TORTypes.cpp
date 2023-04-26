@@ -288,8 +288,7 @@ namespace mlir
   namespace tor
   {
 
-    ::mlir::Type MemRefType::parse(::mlir::MLIRContext *context,
-                                   ::mlir::DialectAsmParser &parser)
+    ::mlir::Type MemRefType::parse(::mlir::AsmParser &parser)
     {
       SmallVector<int64_t, 2> dims;
       SmallVector<mlir::StringAttr, 2> properties;
@@ -359,9 +358,9 @@ namespace mlir
       return success();
     }
 
-    void MemRefType::print(::mlir::DialectAsmPrinter &printer) const
+    void MemRefType::print(::mlir::AsmPrinter &printer) const
     {
-      printer << "memref<";
+      printer << "!tor.memref<";
       auto shape = getShape();
       printer << shape[0];
       for (auto dim : shape.drop_front())
@@ -399,28 +398,28 @@ namespace mlir
           >();
     }
 
-    /// Parses a type registered to this dialect. Parse out the mnemonic then invoke
-    /// the tblgen'd type parser dispatcher.
-    Type TORDialect::parseType(DialectAsmParser &parser) const
-    {
-      llvm::StringRef mnemonic;
-      if (parser.parseKeyword(&mnemonic))
-        return Type();
-      Type type;
-      auto parseResult = generatedTypeParser(getContext(), parser, mnemonic, type);
-      if (parseResult.hasValue())
-        return type;
-      return Type();
-    }
+    // Parses a type registered to this dialect. Parse out the mnemonic then invoke
+    // the tblgen'd type parser dispatcher.
+    // Type TORDialect::parseType(::mlir::DialectAsmParser &parser) const
+    // {
+    //   llvm::StringRef mnemonic;
+    //   if (parser.parseKeyword(&mnemonic))
+    //     return Type();
+    //   Type type;
+    //   auto parseResult = generatedTypeParser(getContext(), parser, mnemonic, type);
+    //   if (parseResult.hasValue())
+    //     return type;
+    //   return Type();
+    // }
 
-    /// Print a type registered to this dialect. Try the tblgen'd type printer
-    /// dispatcher then fail since all RTL types are defined via ODS.
-    void TORDialect::printType(Type type, DialectAsmPrinter &printer) const
-    {
-      if (succeeded(generatedTypePrinter(type, printer)))
-        return;
-      llvm_unreachable("unexpected 'tor' type");
-    }
+    // Print a type registered to this dialect. Try the tblgen'd type printer
+    // dispatcher then fail since all RTL types are defined via ODS.
+    // void TORDialect::printType(Type type, ::mlir::DialectAsmParser &printer) const
+    // {
+    //   if (succeeded(generatedTypePrinter(type, printer)))
+    //     return;
+    //   llvm_unreachable("unexpected 'tor' type");
+    // }
 
     namespace detail
     {

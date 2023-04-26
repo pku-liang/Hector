@@ -5,8 +5,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
@@ -29,6 +29,7 @@
 
 namespace {
     using namespace mlir;
+    using namespace mlir::arith;
     using std::string;
     using nlohmann::json;
     namespace dump_scf {
@@ -97,9 +98,9 @@ namespace {
             json j;
             j["op_type"] = "for";
             j["names"] = json::array();
-            j["lb"] = get_value(forOp.lowerBound());
-            j["ub"] = get_value(forOp.upperBound());
-            j["step"] = get_value(forOp.step());
+            j["lb"] = get_value(forOp.getLowerBound());
+            j["ub"] = get_value(forOp.getUpperBound());
+            j["step"] = get_value(forOp.getStep());
             j["iter_name"] = get_value(forOp.getInductionVar());
             j["iter_args"] = json::array();
             j["iter_inits"] = json::array();
@@ -122,7 +123,7 @@ namespace {
         json get_json(scf::IfOp ifOp) {
             json j;
             j["op_type"] = "if";
-            j["condition"] = get_value(ifOp.condition());
+            j["condition"] = get_value(ifOp.getCondition());
             j["names"] = json::array();
             j["body0"] = json::array();
             j["body1"] = json::array();
@@ -154,7 +155,7 @@ namespace {
             if (auto nop = dyn_cast<ConstantOp>(op)) {
                 j["op_type"] = "constant";
                 j["name"] = get_dump(nop);
-                j["operands"] = {get_attr(nop.valueAttr())};
+                j["operands"] = {get_attr(nop.getValueAttr())};
                 j["type"] = get_type(nop.getType());
             } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
                 j = get_json(forOp);
@@ -162,7 +163,7 @@ namespace {
                 j = get_json(ifOp);
             } else if (auto cmpIOp = dyn_cast<CmpIOp>(op)) {
                 j["operands"] = json::array();
-                j["op_type"] = string("cmp_") + stringifyCmpIPredicate(cmpIOp.predicate()).str();
+                j["op_type"] = string("cmp_") + stringifyCmpIPredicate(cmpIOp.getPredicate()).str();
                 j["name"] = get_dump(cmpIOp);
                 j["type"] = get_type(cmpIOp.getResult().getType());
                 for (const auto &operand : cmpIOp->getOperands()) {
@@ -171,7 +172,7 @@ namespace {
                 return j;
             } else if (auto cmpFOp = dyn_cast<CmpFOp>(op)) {
                 j["operands"] = json::array();
-                j["op_type"] = string("cmp_") + stringifyCmpFPredicate(cmpFOp.predicate()).str();
+                j["op_type"] = string("cmp_") + stringifyCmpFPredicate(cmpFOp.getPredicate()).str();
                 j["name"] = get_dump(cmpFOp);
                 j["type"] = get_type(cmpFOp.getResult().getType());
                 for (const auto &operand : cmpFOp->getOperands()) {
@@ -184,7 +185,7 @@ namespace {
                 assert(loadOp.getNumOperands() == 2);
                 assert(loadOp->getNumResults() == 1);
                 j["index"] = get_value(loadOp.getOperand(1));
-                j["memory"] = get_value(loadOp.memref());
+                j["memory"] = get_value(loadOp.getMemref());
             } else if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
                 j["op_type"] = "yield";
                 j["operands"] = json::array();
@@ -200,11 +201,11 @@ namespace {
             } else if (auto storeOp = dyn_cast<tor::StoreOp>(op)) {
                 assert(storeOp.getIndices().size() == 1);
                 j["op_type"] = "store";
-                j["index"] = get_value(storeOp.indices()[0]);
-                j["memory"] = get_value(storeOp.memref());
-                j["value"] = get_value(storeOp.value());
+                j["index"] = get_value(storeOp.getIndices()[0]);
+                j["memory"] = get_value(storeOp.getMemref());
+                j["value"] = get_value(storeOp.getValue());
             } else {
-                OPERATION(ShiftLeftOp, "shift_left")
+                OPERATION(ShLIOp, "shift_left")
                 OPERATION(AddIOp, "add")
                 OPERATION(MulIOp, "mul")
                 OPERATION(SubIOp, "sub")
@@ -214,11 +215,11 @@ namespace {
                 OPERATION(AddFOp, "add")
                 OPERATION(MulFOp, "mul")
                 OPERATION(SubFOp, "sub")
-                OPERATION(TruncateIOp, "trunc")
+                OPERATION(TruncIOp, "trunc")
                 OPERATION(SelectOp, "select")
-                OPERATION(AndOp, "and")
-                OPERATION(OrOp, "or")
-                OPERATION(XOrOp, "xor")
+                OPERATION(AndIOp, "and")
+                OPERATION(OrIOp, "or")
+                OPERATION(XOrIOp, "xor")
                 OPERATION(DivFOp, "div")
 
 
@@ -237,7 +238,7 @@ namespace {
             //TODO: types & args
 
 //            funcOp.getType().getInputs()
-            for (auto &op : *(funcOp.getBodyBlock())) {
+            for (auto &op : funcOp.getBody().front()) {
                 j["body"].push_back(get_json(&op));
             }
             return j;
@@ -249,11 +250,11 @@ namespace {
             j["memory"] = json::array();
             j["modules"] = json::array();
 
-            for (auto &op : *(designOp.getBody())) {
+            for (auto &op : designOp.getBody().front()) {
                 if (auto allocOp = dyn_cast<tor::AllocOp>(op)) {
                     json sj;
                     sj["name"] = get_dump(allocOp);
-                    auto mem_type = allocOp.memref().getType().dyn_cast<tor::MemRefType>();
+                    auto mem_type = allocOp.getMemref().getType().dyn_cast<tor::MemRefType>();
                     sj["size"] = mem_type.getShape()[0];
                     sj["type"] = get_type(mem_type.getElementType());
                     j["memory"].push_back(sj);

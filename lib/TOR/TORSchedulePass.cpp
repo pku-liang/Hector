@@ -1,5 +1,5 @@
 #include "TOR/PassDetail.h"
-#include "mlir/Analysis/Utils.h"
+// #include "mlir/Analysis/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -9,8 +9,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "TOR/TOR.h"
 #include "TOR/TORDialect.h"
 #include "TOR/Passes.h"
@@ -23,9 +23,9 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Matchers.h"
-#include <mlir/Transforms/DialectConversion.h>
+#include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/Utils.h"
+// #include "mlir/Transforms/Utils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -43,6 +43,8 @@
 #include <unordered_map>
 #include <set>
 #define DEBUG_TYPE "create-tor"
+
+using namespace mlir::arith;
 
 class DisjointSet {
 public:
@@ -114,18 +116,18 @@ public:
 
     if (edge.length > 0)
       retStr += std::string(":") + std::to_string(edge.length);
-    attrs.push_back(std::make_pair(mlir::Identifier::get("type", ctx), 
+    attrs.push_back(mlir::NamedAttribute(mlir::StringAttr::get(ctx, "type"), 
         mlir::StringAttr::get(ctx, retStr)));
 
     if (edge.II != -1) {
-      attrs.push_back(std::make_pair(mlir::Identifier::get("pipeline", ctx), 
+      attrs.push_back(mlir::NamedAttribute(mlir::StringAttr::get(ctx, "pipeline"), 
           mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 32), 1)));
-      attrs.push_back(std::make_pair(mlir::Identifier::get("II", ctx), 
+      attrs.push_back(mlir::NamedAttribute(mlir::StringAttr::get(ctx, "II"), 
           mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 32), edge.II)));
     }
 
     if (edge.tripcount != -1)
-      attrs.push_back(std::make_pair(mlir::Identifier::get("times", ctx), 
+      attrs.push_back(mlir::NamedAttribute(mlir::StringAttr::get(ctx, "times"), 
         mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 32), edge.tripcount)));
 
     mlir::DictionaryAttr dict = mlir::DictionaryAttr::get(ctx, attrs);
@@ -290,10 +292,10 @@ int buildTimeGraph(TimeGraph &tg,
 
       currentNode = buildTimeGraphBlock(tg, vec, currentNode, scheduler);
 
-      if (!ifOp.elseRegion().empty()) {
+      if (!ifOp.getElseRegion().empty()) {
 
-        int thenNode = buildTimeGraph(tg, ifOp.thenRegion().front(), currentNode, scheduler);
-        int elseNode = buildTimeGraph(tg, ifOp.elseRegion().front(), currentNode, scheduler);
+        int thenNode = buildTimeGraph(tg, ifOp.getThenRegion().front(), currentNode, scheduler);
+        int elseNode = buildTimeGraph(tg, ifOp.getElseRegion().front(), currentNode, scheduler);
         int nxtNode = tg.addNode(thenNode, "static", 0);
 
         tg.addEdge(elseNode, nxtNode, "static", 0);
@@ -301,7 +303,7 @@ int buildTimeGraph(TimeGraph &tg,
         currentNode = nxtNode;
       } else {
 
-        int thenNode = buildTimeGraph(tg, ifOp.thenRegion().front(), currentNode, scheduler);
+        int thenNode = buildTimeGraph(tg, ifOp.getThenRegion().front(), currentNode, scheduler);
         //int nxtNode = tg.addNode(thenNode, "static", 0);
         int nxtNode = thenNode;
 
@@ -313,8 +315,8 @@ int buildTimeGraph(TimeGraph &tg,
 
       currentNode = buildTimeGraphBlock(tg, vec, currentNode, scheduler);
       int beginNode = tg.addNode(currentNode, "static", 0);
-      int condNode = buildTimeGraph(tg, whileOp.before().front(), beginNode, scheduler);
-      int endNode = buildTimeGraph(tg, whileOp.after().front(), condNode, scheduler); // body
+      int condNode = buildTimeGraph(tg, whileOp.getBefore().front(), beginNode, scheduler);
+      int endNode = buildTimeGraph(tg, whileOp.getAfter().front(), condNode, scheduler); // body
       int nxtNode = 0;
 
       auto info = scheduler->queryLoop(&op);
@@ -363,7 +365,7 @@ int buildTimeGraph(TimeGraph &tg,
         continue;
       if (llvm::isa<mlir::tor::ReturnOp>(op))
         continue;
-      if (llvm::isa<mlir::ConstantOp>(op))
+      if (llvm::isa<ConstantOp>(op))
         continue;
 
       vec.push_back(&op);
@@ -449,11 +451,12 @@ namespace mlir
       llvm::SmallVector<NamedAttribute, 4> attributes;
       for (const auto &attr : funcOp->getAttrs())
       {
-        if (attr.first == SymbolTable::getSymbolAttrName() ||
-            attr.first == impl::getTypeAttrName())
+        if (attr.getName() == SymbolTable::getSymbolAttrName() ||
+            attr.getName() == mlir::function_interface_impl::getTypeAttrName())
           continue;
         attributes.push_back(attr);
       }
+
 
       llvm::SmallVector<mlir::Type, 8> argTypes;
       for (auto &arg : funcOp.getArguments())
@@ -463,7 +466,7 @@ namespace mlir
       }
 
       llvm::SmallVector<mlir::Type, 8> resTypes;
-      for (auto &resultType : funcOp.getType().getResults())
+      for (auto &resultType : funcOp.getFunctionType().getResults())
       {
         resTypes.push_back(resultType);
       }

@@ -11,7 +11,6 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/IR/Identifier.h"
 #include "TOR/TOR.h"
 #include "TOR/TORTypes.h"
 #include "Schedule/CDFG.h"

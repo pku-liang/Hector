@@ -5,8 +5,9 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
@@ -25,21 +26,31 @@
 
 namespace {
     using namespace mlir;
+    using namespace mlir::arith;
+
+    template<typename SourceOp, typename TargetOp>
+    void myReplaceOp(SourceOp op, TargetOp newOp, ConversionPatternRewriter &rewriter) {
+        // for (auto [newValue, oldValue] : llvm::zip(op.getResults(), newOp.getResults())) {
+        //     newValue.replaceAllUsesWith(oldValue);
+        // }
+        op.getResult().replaceAllUsesWith(newOp.getResult());
+        rewriter.eraseOp(op);
+    }
 
     struct ConstIndexConversion : public OpConversionPattern<ConstantOp> {
         using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
+        matchAndRewrite(ConstantOp op, ConstantOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
-
-            auto value = op.getValue();
-            rewriter.setInsertionPoint(op);
             if (op.getResult().getType().isa<IndexType>()) {
+                auto value = adaptor.getValue();
+                rewriter.setInsertionPoint(op);
                 auto newOp = rewriter.create<ConstantIntOp>(
                         op->getLoc(), value.cast<IntegerAttr>().getInt(), 32);
                 newOp->setAttr("dump", op->getAttr("dump"));
-                rewriter.replaceOp(op, newOp.getResult());
+                // rewriter.replaceOp(op, {newOp.getResult()});
+                myReplaceOp(op, newOp, rewriter);
                 return success();
             }
 
@@ -51,8 +62,9 @@ namespace {
         using OpConversionPattern<scf::YieldOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(scf::YieldOp op, ArrayRef<Value> operands,
+        matchAndRewrite(scf::YieldOp op, scf::YieldOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             for (auto opr : operands)
                 if (opr.getType().isa<IndexType>())
                     return failure();
@@ -69,8 +81,9 @@ namespace {
         using OpConversionPattern<scf::IfOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(scf::IfOp op, ArrayRef<Value> operands,
+        matchAndRewrite(scf::IfOp op, scf::IfOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             for (auto opr : operands)
                 if (opr.getType().isa<IndexType>())
                     return failure();
@@ -87,14 +100,14 @@ namespace {
                                                     operands[0], 0, 0);
             newOp->setAttr("dump", op->getAttr("dump"));
 
-            rewriter.createBlock(&newOp.thenRegion());
-            rewriter.inlineRegionBefore(op.thenRegion(), &newOp.thenRegion().back());
-            rewriter.eraseBlock(&newOp.thenRegion().back());
+            rewriter.createBlock(&newOp.getThenRegion());
+            rewriter.inlineRegionBefore(op.getThenRegion(), &newOp.getThenRegion().back());
+            rewriter.eraseBlock(&newOp.getThenRegion().back());
 
-            if (!op.elseRegion().empty()) {
-                rewriter.createBlock(&newOp.elseRegion());
-                rewriter.inlineRegionBefore(op.elseRegion(), &newOp.elseRegion().back());
-                rewriter.eraseBlock(&newOp.elseRegion().back());
+            if (!op.getElseRegion().empty()) {
+                rewriter.createBlock(&newOp.getElseRegion());
+                rewriter.inlineRegionBefore(op.getElseRegion(), &newOp.getElseRegion().back());
+                rewriter.eraseBlock(&newOp.getElseRegion().back());
             }
 
             rewriter.replaceOp(op, newOp.getResults());
@@ -107,8 +120,9 @@ namespace {
         using OpConversionPattern<scf::ConditionOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(scf::ConditionOp op, ArrayRef<Value> operands,
+        matchAndRewrite(scf::ConditionOp op, scf::ConditionOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             for (auto opr : operands)
                 if (opr.getType().isa<IndexType>())
                     return failure();
@@ -126,8 +140,9 @@ namespace {
         using OpConversionPattern<scf::WhileOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(scf::WhileOp op, ArrayRef<Value> operands,
+        matchAndRewrite(scf::WhileOp op, scf::WhileOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             for (auto opr : operands)
                 if (opr.getType().isa<IndexType>())
                     return failure();
@@ -153,10 +168,10 @@ namespace {
                                                           mlir::IntegerType::Signless),
                                    0));
 
-            rewriter.inlineRegionBefore(op.before(), newOp.before(),
-                                        newOp.before().begin());
-            rewriter.inlineRegionBefore(op.after(), newOp.after(),
-                                        newOp.after().begin());
+            rewriter.inlineRegionBefore(op.getBefore(), newOp.getBefore(),
+                                        newOp.getBefore().begin());
+            rewriter.inlineRegionBefore(op.getAfter(), newOp.getAfter(),
+                                        newOp.getAfter().begin());
             rewriter.replaceOp(op, newOp.getResults());
 
             return success();
@@ -167,8 +182,9 @@ namespace {
         using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+        matchAndRewrite(scf::ForOp op, scf::ForOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             for (auto opr : operands)
                 if (opr.getType().isa<IndexType>())
                     return failure();
@@ -198,8 +214,8 @@ namespace {
                                                           mlir::IntegerType::Signless),
                                    0));
 
-            rewriter.inlineRegionBefore(op.region(), newOp.region(),
-                                        newOp.region().begin());
+            rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(),
+                                        newOp.getRegion().begin());
 
             for (auto pair : llvm::zip(newOp.getBody()->getArguments(),
                                        newOp.getBody()->getArgumentTypes()))
@@ -207,17 +223,19 @@ namespace {
                     std::get<0>(pair).setType(IntegerType::get(getContext(), 32));
 
             rewriter.replaceOp(op, newOp.getResults());
+            
 
             return success();
         }
     };
 
-    struct CallOpConversion : public OpConversionPattern<mlir::CallOp> {
-        using OpConversionPattern<CallOp>::OpConversionPattern;
+    struct CallOpConversion : public OpConversionPattern<func::CallOp> {
+        using OpConversionPattern<func::CallOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(mlir::CallOp op, ArrayRef<Value> operands,
+        matchAndRewrite(func::CallOp op, func::CallOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             for (auto opr : operands)
                 if (opr.getType().isa<IndexType>())
                     return failure();
@@ -236,13 +254,15 @@ namespace {
         using OpConversionPattern<SourceOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(SourceOp op, ArrayRef<Value> operands,
+        matchAndRewrite(SourceOp op, typename SourceOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             assert(operands.size() == 2 && "addi has two operand");
 
-            for (auto opr : operands)
-                if (opr.getType().isa<IndexType>())
+            for (auto opr : operands) {
+                if (opr.getType().template isa<IndexType>())
                     return failure();
+            }
 
             rewriter.setInsertionPoint(op);
 
@@ -255,7 +275,9 @@ namespace {
                                                   operands[0], operands[1], 0, 0);
             newOp->setAttr("dump", op->getAttr("dump"));
 
-            rewriter.replaceOp(op, newOp.getResult());
+            // rewriter.replaceOp(op, newOp.getResult());
+            myReplaceOp(op, newOp, rewriter);
+            // newOp->getParentOp()->dump();
 
             return success();
         }
@@ -266,15 +288,17 @@ namespace {
         using OpConversionPattern<SourceOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(SourceOp op, ArrayRef<Value> operands,
+        matchAndRewrite(SourceOp op, typename SourceOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             rewriter.setInsertionPoint(op);
 
             TargetOp newOp = rewriter.create<TargetOp>(
                     op.getLoc(), op.getResult().getType(), operands[0], operands[1], 0, 0);
             newOp->setAttr("dump", op->getAttr("dump"));
 
-            rewriter.replaceOp(op, newOp.getResult());
+            // rewriter.replaceOp(op, newOp.getResult());
+            myReplaceOp(op, newOp, rewriter);
 
             return success();
         }
@@ -292,8 +316,9 @@ namespace {
         using OpConversionPattern<CmpIOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(CmpIOp op, ArrayRef<Value> operands,
+        matchAndRewrite(CmpIOp op, CmpIOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             assert(operands.size() == 2 && "addi has two operand");
 
             for (auto opr : operands)
@@ -301,13 +326,14 @@ namespace {
                     return failure();
 
             rewriter.setInsertionPoint(op);
-            auto predicate = static_cast<mlir::tor::CmpIPredicate>(op.predicate());
+            auto predicate = static_cast<mlir::tor::CmpIPredicate>(op.getPredicate());
             auto newOp = rewriter.create<tor::CmpIOp>(
                     op.getLoc(), op.getResult().getType(), predicate, operands[0],
                     operands[1], 0, 0);
             newOp->setAttr("dump", op->getAttr("dump"));
 
-            rewriter.replaceOp(op, newOp.getResult());
+            // rewriter.replaceOp(op, newOp.getResult());
+            myReplaceOp(op, newOp, rewriter);
 
             return success();
         }
@@ -317,18 +343,20 @@ namespace {
         using OpConversionPattern<CmpFOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(CmpFOp op, ArrayRef<Value> operands,
+        matchAndRewrite(CmpFOp op, CmpFOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             assert(operands.size() == 2 && "cmpf has two operand");
 
             rewriter.setInsertionPoint(op);
-            auto predicate = static_cast<mlir::tor::CmpFPredicate>(op.predicate());
+            auto predicate = static_cast<mlir::tor::CmpFPredicate>(op.getPredicate());
             auto newOp = rewriter.create<tor::CmpFOp>(
                     op.getLoc(), op.getResult().getType(), predicate, operands[0],
                     operands[1], 0, 0);
             newOp->setAttr("dump", op->getAttr("dump"));
 
-            rewriter.replaceOp(op, newOp.getResult());
+            // rewriter.replaceOp(op, newOp.getResult());
+            myReplaceOp(op, newOp, rewriter);
 
             return success();
         }
@@ -338,22 +366,26 @@ namespace {
         using OpConversionPattern<IndexCastOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(IndexCastOp op, ArrayRef<Value> operands,
+        matchAndRewrite(IndexCastOp op, IndexCastOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             if (operands[0].getType().isa<IndexType>())
                 return failure();
 
-            rewriter.replaceOp(op, operands);
+            // rewriter.replaceOp(op, operands);
+            op.getResult().replaceAllUsesWith(operands[0]);
+            rewriter.eraseOp(op);
             return success();
         }
     };
 
-    struct ShiftLeftConversionPattern : public OpConversionPattern<ShiftLeftOp> {
-        using OpConversionPattern<ShiftLeftOp>::OpConversionPattern;
+    struct ShiftLeftConversionPattern : public OpConversionPattern<ShLIOp> {
+        using OpConversionPattern<ShLIOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(ShiftLeftOp op, ArrayRef<Value> operands,
+        matchAndRewrite(ShLIOp op, ShLIOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            auto operands = adaptor.getOperands();
             for (auto opr : operands)
                 if (opr.getType().isa<IndexType>())
                     return failure();
@@ -361,23 +393,24 @@ namespace {
                 return failure();
 
             auto newOp =
-                    rewriter.create<ShiftLeftOp>(op.getLoc(), operands[0], operands[1]);
+                    rewriter.create<ShLIOp>(op.getLoc(), operands[0], operands[1]);
             newOp->setAttr("dump", op->getAttr("dump"));
 
-            rewriter.replaceOp(op, newOp.getResult());
-            llvm::outs() << "Yeh!\n";
+            // rewriter.replaceOp(op, newOp.getResult());
+            myReplaceOp(op, newOp, rewriter);
+            // llvm::outs() << "Yeh!\n";
             return success();
         }
     };
 
-    struct FuncArgCovnersion : public OpConversionPattern<tor::FuncOp> {
+    struct FuncArgConversion : public OpConversionPattern<tor::FuncOp> {
         using OpConversionPattern<tor::FuncOp>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(tor::FuncOp op, ArrayRef<Value> operands,
+        matchAndRewrite(tor::FuncOp op, tor::FuncOp::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
             SmallVector<Type, 4> newInputTypes;
-            for (auto type : op.getType().getInputs())
+            for (auto type : op.getFunctionType().getInputs())
                 if (type.isa<IndexType>())
                     newInputTypes.push_back(IntegerType::get(getContext(), 32));
                 else
@@ -388,7 +421,7 @@ namespace {
                     if (arg.getType().isa<IndexType>())
                         arg.setType(IntegerType::get(getContext(), 32));
                 op.setType(FunctionType::get(getContext(), newInputTypes,
-                                             op.getType().getResults()));
+                                             op.getFunctionType().getResults()));
             });
 
             return success();
@@ -415,20 +448,20 @@ namespace {
                 for (auto value : results)
                     for (auto succop : value.getUsers())
                         WorkingList.insert(succop);
-            } else if (auto sitofOp = llvm::dyn_cast<mlir::SIToFPOp>(op)) {
+            } else if (auto sitofOp = llvm::dyn_cast<SIToFPOp>(op)) {
                 mlir::APInt val;
                 if (mlir::matchPattern(sitofOp.getOperand(), mlir::m_ConstantInt(&val))) {
                     mlir::Operation *op;
                     if (sitofOp.getResult().getType().isF32())
-                        op = rewriter.create<mlir::ConstantFloatOp>(
+                        op = rewriter.create<ConstantFloatOp>(
                                 sitofOp.getLoc(), mlir::APFloat((float) val.roundToDouble()),
                                 sitofOp.getResult().getType().cast<mlir::FloatType>());
                     else
-                        op = rewriter.create<mlir::ConstantFloatOp>(
+                        op = rewriter.create<ConstantFloatOp>(
                                 sitofOp.getLoc(), mlir::APFloat(val.roundToDouble()),
                                 sitofOp.getResult().getType().cast<mlir::FloatType>());
 
-                    auto constOp = llvm::dyn_cast<mlir::ConstantOp>(op);
+                    auto constOp = llvm::dyn_cast<ConstantOp>(op);
                     rewriter.replaceOp(sitofOp, constOp.getResult());
                     for (auto succop : constOp.getResult().getUsers())
                         WorkingList.insert(succop);
@@ -457,13 +490,12 @@ namespace {
         LogicalResult matchAndRewrite(ConstantOp op, PatternRewriter &rewriter) const override {
             if (llvm::isa<tor::DesignOp>(op->getParentOp()))
                 return failure();
-
             auto topParent = op->getParentOfType<tor::DesignOp>();
 
             assert(topParent);
 
-            rewriter.setInsertionPoint(topParent.getBody(),
-                                       topParent.getBody()->begin());
+            rewriter.setInsertionPoint(&(topParent.getBody().front()),
+                                       topParent.getBody().front().begin());
 
             auto newOp = rewriter.clone(*op.getOperation());
 
@@ -492,8 +524,8 @@ namespace {
                 RewritePatternSet patterns(&getContext());
 
                 target.addLegalDialect<tor::TORDialect>();
-                target.addDynamicallyLegalOp<ShiftLeftOp>([](ShiftLeftOp op) {
-                    llvm::outs() << "GOOD\n";
+                target.addDynamicallyLegalOp<ShLIOp>([](ShLIOp op) {
+                    // llvm::outs() << "GOOD\n";
                     if (op.getResult().getType().isa<IndexType>())
                         return false;
                     return true;
@@ -501,8 +533,8 @@ namespace {
                 target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) {
                     if (op.getResult().getType().isa<IndexType>())
                         return false;
-                    if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
-                        return false;
+                    // if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
+                    //     return false;
                     return true;
                 });
                 target.addDynamicallyLegalOp<tor::FuncOp>([](tor::FuncOp op) {
@@ -516,9 +548,26 @@ namespace {
                         SubIOpConversion, CmpIOpConversion, MulFOpConversion,
                         AddFOpConversion, SubFOpConversion, DivFOpConversion,
                         YieldOpConversion, CondOpConversion, WhileOpConversion,
-                        ForOpConversion, IfOpConversion, FuncArgCovnersion,
+                        ForOpConversion, IfOpConversion, FuncArgConversion,
                         CastOpErasure, CmpFOpConversion, ShiftLeftConversionPattern,
-                        MoveConstantUp, CallOpConversion>(&getContext());
+                        /*MoveConstantUp, */CallOpConversion>(&getContext());
+
+                if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
+                    signalPassFailure();
+            }
+
+            {
+                ConversionTarget target(getContext());
+                RewritePatternSet patterns(&getContext());
+
+                target.addLegalDialect<tor::TORDialect>();
+                target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) {
+                    if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
+                        return false;
+                    return true;
+                });
+
+                patterns.add<MoveConstantUp>(&getContext());
 
                 if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
                     signalPassFailure();

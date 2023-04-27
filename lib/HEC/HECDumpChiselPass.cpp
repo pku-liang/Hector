@@ -166,7 +166,7 @@ namespace mlir {
         }
 
         string getName(hec::CmpIOp cmpIOp) {
-            string type = get(cmpIOp.getPredAttrName().getValue());
+            string type = get(cmpIOp.getPred());
             if (type == "sle") {
                 return " <= ";
             } else if (type == "slt") {
@@ -181,7 +181,6 @@ namespace mlir {
                 return " === ";
             } else {
                 cmpIOp->dump();
-                assert(false && "Unknown cmpI type");
                 return "???";
             }
         }

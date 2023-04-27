@@ -142,7 +142,7 @@ namespace {
             json j;
             if (auto cmpIOp = dyn_cast<hec::CmpIOp>(op)) {
                 j["operands"] = json::array();
-                j["op_type"] = string("cmp_") + cmpIOp.getPredAttrName().str();
+                j["op_type"] = string("cmp_") + cmpIOp.getPred().str();
                 j["name"] = get_dump(cmpIOp);
                 j["type"] = get_type(cmpIOp.getResult().getType());
                 for (const auto &operand : cmpIOp->getOperands()) {

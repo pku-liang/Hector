@@ -18,6 +18,8 @@ namespace mlir {
 
     std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createSCFDumpPass();
 
+    std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertInputPass();
+
     std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createTORDumpPass();
 
     // std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createWidthAnalysisPass();

@@ -33,6 +33,17 @@ def SCFToTOR : Pass<"scf-to-tor", "mlir::tor::DesignOp"> {
   let dependentDialects = ["mlir::tor::TORDialect"];
 }
 
+def ConvertInput : Pass<"convert-input", "mlir::ModuleOp"> {
+  let summary = "Convert to suitable input";
+  let constructor = "mlir::createConvertInputPass()";
+  let dependentDialects = ["mlir::tor::TORDialect"];
+  let options = [
+    Option<"top_function", "top-function", "std::string", "\"main\"", "The top function name">,
+    Option<"clock", "clock", "double", "6.0", "Clock cycle">,
+    Option<"resource", "resource", "std::string", "\"./resource_dynamatic.json\"", "Resource file">,
+  ];
+}
+
 def SCFDump : Pass<"dump-scf", "mlir::tor::DesignOp"> {
   let summary = "Dump SCF information";
   let constructor = "mlir::createSCFDumpPass()";

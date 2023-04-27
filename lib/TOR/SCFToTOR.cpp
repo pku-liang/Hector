@@ -403,7 +403,7 @@ namespace {
         }
     };
 
-    struct FuncArgConversion : public OpConversionPattern<tor::FuncOp> {
+    struct FuncOpPattern : public OpConversionPattern<tor::FuncOp> {
         using OpConversionPattern<tor::FuncOp>::OpConversionPattern;
 
         LogicalResult
@@ -470,7 +470,7 @@ namespace {
         }
     }
 
-    struct ConstantFoldingPattern : OpRewritePattern<tor::FuncOp> {
+    struct DesignOpPattern : OpRewritePattern<tor::FuncOp> {
         using OpRewritePattern<tor::FuncOp>::OpRewritePattern;
 
         LogicalResult matchAndRewrite(tor::FuncOp op,
@@ -505,14 +505,14 @@ namespace {
         }
     };
 
-    struct SCFToTORPass : SCFToTORBase<SCFToTORPass> {
+    struct ConvertInputPass : SCFToTORBase<ConvertInputPass> {
         void runOnOperation() override {
             auto designOp = getOperation();
 
             {
                 designOp.walk([&](tor::FuncOp op) {
                     RewritePatternSet rPatterns(&getContext());
-                    rPatterns.insert<ConstantFoldingPattern>(&getContext());
+                    rPatterns.insert<DesignOpPattern>(&getContext());
                     if (failed(applyOpPatternsAndFold(op, std::move(rPatterns))))
                         WalkResult::interrupt();
                     WalkResult::advance();
@@ -548,7 +548,7 @@ namespace {
                         SubIOpConversion, CmpIOpConversion, MulFOpConversion,
                         AddFOpConversion, SubFOpConversion, DivFOpConversion,
                         YieldOpConversion, CondOpConversion, WhileOpConversion,
-                        ForOpConversion, IfOpConversion, FuncArgConversion,
+                        ForOpConversion, IfOpConversion, FuncOpPattern,
                         CastOpErasure, CmpFOpConversion, ShiftLeftConversionPattern,
                         /*MoveConstantUp, */CallOpConversion>(&getContext());
 
@@ -581,7 +581,7 @@ namespace {
 namespace mlir {
 
     std::unique_ptr<OperationPass<tor::DesignOp>> createSCFToTORPass() {
-        return std::make_unique<SCFToTORPass>();
+        return std::make_unique<ConvertInputPass>();
     }
 
 } // namespace mlir

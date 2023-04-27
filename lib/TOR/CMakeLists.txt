@@ -6,7 +6,8 @@ add_mlir_dialect_library(MLIRTOR
     SCFToTOR.cpp
     TORSchedulePass.cpp
     TORSplitPass.cpp
-    TORDump.cpp    
+    TORDump.cpp
+    ConvertInput.cpp
     
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TOR

@@ -35,9 +35,9 @@ for kernel_dir in "$KERNEL_DIR"/tuned/*.mlir; do
 	fail_log="${kernel%.*}.log"
 	echo "kernel: $kernel"
 
-	COMMAND0="$BIN --dump-scf $SCF_TO_TOR $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel""
+	COMMAND0="$BIN --dump-scf $SCF_TO_TOR --canonicalize $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel""
 	echo "$COMMAND0"
-	$BIN --dump-scf $SCF_TO_TOR $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel" >out 2>error
+	$BIN --dump-scf $SCF_TO_TOR --canonicalize $SCHEDULE "$KERNEL_DIR/tuned/$kernel" -o "$KERNEL_DIR/tor-raw/$kernel" >out 2>error
 
 	COMMAND1="$BIN $SPLIT --dump-tor "$KERNEL_DIR/tor-raw/$kernel" -o "$KERNEL_DIR/tor-split/$kernel""
 	echo "$COMMAND1"

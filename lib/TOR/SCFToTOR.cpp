@@ -190,8 +190,10 @@ namespace {
                     return failure();
 
             rewriter.setInsertionPoint(op);
+            auto upperBound = rewriter.create<SubIOp>(op.getLoc(), operands[1], operands[2]);
+
             auto newOp = rewriter.create<tor::ForOp>(
-                    op.getLoc(), operands[0], operands[1], operands[2],
+                    op.getLoc(), operands[0], upperBound.getResult(), operands[2],
                     mlir::IntegerAttr::get(
                             mlir::IntegerType::get(getContext(), 32,
                                                    mlir::IntegerType::Signless),
@@ -509,15 +511,15 @@ namespace {
         void runOnOperation() override {
             auto designOp = getOperation();
 
-            {
-                designOp.walk([&](tor::FuncOp op) {
-                    RewritePatternSet rPatterns(&getContext());
-                    rPatterns.insert<DesignOpPattern>(&getContext());
-                    if (failed(applyOpPatternsAndFold(op, std::move(rPatterns))))
-                        WalkResult::interrupt();
-                    WalkResult::advance();
-                });
-            }
+            // {
+            //     designOp.walk([&](tor::FuncOp op) {
+            //         RewritePatternSet rPatterns(&getContext());
+            //         rPatterns.insert<DesignOpPattern>(&getContext());
+            //         if (failed(applyOpPatternsAndFold(op, std::move(rPatterns))))
+            //             WalkResult::interrupt();
+            //         WalkResult::advance();
+            //     });
+            // }
 
             {
                 ConversionTarget target(getContext());
@@ -572,6 +574,16 @@ namespace {
                 if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
                     signalPassFailure();
             }
+
+            // {
+            //     designOp.walk([&](tor::FuncOp op) {
+            //         RewritePatternSet rPatterns(&getContext());
+            //         rPatterns.insert<DesignOpPattern>(&getContext());
+            //         if (failed(applyOpPatternsAndFold(op, std::move(rPatterns))))
+            //             WalkResult::interrupt();
+            //         WalkResult::advance();
+            //     });
+            // }
 
         }
     };

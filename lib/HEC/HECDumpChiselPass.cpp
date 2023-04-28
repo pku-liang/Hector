@@ -181,7 +181,7 @@ namespace mlir {
                 return " === ";
             } else {
                 cmpIOp->dump();
-                return "???";
+                assert(false);
             }
         }
 

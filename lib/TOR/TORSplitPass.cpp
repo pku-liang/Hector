@@ -134,7 +134,7 @@ namespace mlir {
                         }
                     }
                 }
-                timeGraphOp->dump();
+                // timeGraphOp->dump();
                 bool foundStatic = false;
                 bool foundDynamic = false;
                 bool foundPipeline = false;
@@ -143,7 +143,7 @@ namespace mlir {
                 MAX_INDEX = std::max(START, END);
                 for (auto &block : timeGraphOp.getRegion()) {
                     for (auto &op : block) {
-                        op.dump();
+                        // op.dump();
                         if (auto succ = dyn_cast<tor::SuccTimeOp>(op)) {
                             MAX_INDEX = std::max(MAX_INDEX, succ.getTime());
                             for (unsigned i = 0; i < succ.getPoints().size(); i++) {
@@ -151,7 +151,7 @@ namespace mlir {
                                 auto comp_edge = succ.getEdges()[i].cast<DictionaryAttr>();
                                 bool pipeline = comp_edge.get("pipeline").operator bool();
                                 if (pipeline) {
-                                    succ->dump();
+                                    // succ->dump();
                                 }
                                 foundPipeline |= pipeline;
                                 auto edge_info = comp_edge.get("type");
@@ -173,7 +173,7 @@ namespace mlir {
                                     edge_info.dump();
                                     assert("Unexpected edge_info attribute" && false);
                                 }
-                                std::cerr << "???" << succ.getTime() << std::endl;
+                                // std::cerr << "???" << succ.getTime() << std::endl;
                                 succOp[succ.getTime()] = &op;
                             }
                         }

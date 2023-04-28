@@ -675,8 +675,8 @@ void SDCSchedule::addMemConstr(SDCSolver *SDC) {
     for (int i = 0, n = constrainedOp.size(); i < n; ++i) {
       for (int j = i + 1; j < n; ++j)
         if (hasMemPortConflict(constrainedOp[i], constrainedOp[j])) {
-          constrainedOp[i]->getOp()->dump();
-          constrainedOp[j]->getOp()->dump();
+          // constrainedOp[i]->getOp()->dump();
+          // constrainedOp[j]->getOp()->dump();
           SDC->addInitialConstraint(Constraint::CreateGE(
               constrainedOp[j]->VarId, constrainedOp[i]->VarId, 1));
         }

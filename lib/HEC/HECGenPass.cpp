@@ -515,10 +515,10 @@ namespace mlir {
                     color[i] = candidate;
                 }
 
-                std::cerr << "Coloring: ";
-                for (auto x : color)
-                    std::cerr << x << " ";
-                std::cerr << std::endl;
+                // std::cerr << "Coloring: ";
+                // for (auto x : color)
+                    // std::cerr << x << " ";
+                // std::cerr << std::endl;
                 return color;
             }
         };
@@ -631,10 +631,10 @@ namespace mlir {
                     }
                 }
 
-                std::cerr << "Depth: " << std::endl;
-                for (size_t i = 0; i < n; i++)
-                    std::cerr << depth[i] << " ";
-                std::cerr << std::endl;
+                // std::cerr << "Depth: " << std::endl;
+                // for (size_t i = 0; i < n; i++)
+                //     std::cerr << depth[i] << " ";
+                // std::cerr << std::endl;
 
                 return cycles.size();
             }
@@ -697,8 +697,8 @@ namespace mlir {
             }
 
             Memory mapValueMem(mlir::Value value) {
-                std::cerr << "map value to mem: ";
-                value.dump();
+                // std::cerr << "map value to mem: ";
+                // value.dump();
                 for (auto vud : valueUseDefs)
                     if (vud.value == value) {
                         switch (vud.type) {
@@ -782,8 +782,8 @@ namespace mlir {
             }
 
             void gen_component(mlir::hec::DesignOp design) {
-                std::cerr << "ComponentGen for FuncOp " << func.getName().str()
-                          << std::endl;
+                // std::cerr << "ComponentGen for FuncOp " << func.getName().str()
+                        //   << std::endl;
 
                 auto context = design.getContext();
                 rewriter.setInsertionPointToEnd(&(design.getBody().front()));
@@ -808,12 +808,12 @@ namespace mlir {
                             hec::ComponentPortInfo(mlir::StringAttr::get(context, port_name),
                                                    inPort, hec::PortDirection::INPUT));
 
-                    std::cerr << "\t InPort  " << ports.back().name.getValue().str() << " : ";
-                    std::string typeStr;
-                    llvm::raw_string_ostream stro(typeStr);
-                    ports.back().type.print(stro);
-                    stro.flush();
-                    std::cerr << typeStr << std::endl;
+                    // std::cerr << "\t InPort  " << ports.back().name.getValue().str() << " : ";
+                    // std::string typeStr;
+                    // llvm::raw_string_ostream stro(typeStr);
+                    // ports.back().type.print(stro);
+                    // stro.flush();
+                    // std::cerr << typeStr << std::endl;
                 }
 
                 icount += 1;
@@ -830,13 +830,13 @@ namespace mlir {
                             hec::ComponentPortInfo(mlir::StringAttr::get(context, port_name),
                                                    outPort, hec::PortDirection::OUTPUT));
 
-                    std::cerr << "\t OutPort  " << ports.back().name.getValue().str()
-                              << " : ";
-                    std::string typeStr;
-                    llvm::raw_string_ostream stro(typeStr);
-                    ports.back().type.print(stro);
-                    stro.flush();
-                    std::cerr << typeStr << std::endl;
+                    // std::cerr << "\t OutPort  " << ports.back().name.getValue().str()
+                    //           << " : ";
+                    // std::string typeStr;
+                    // llvm::raw_string_ostream stro(typeStr);
+                    // ports.back().type.print(stro);
+                    // stro.flush();
+                    // std::cerr << typeStr << std::endl;
                 }
 
                 ocount += 1;
@@ -846,7 +846,7 @@ namespace mlir {
 
                 component = rewriter.create<mlir::hec::ComponentOp>(design.getLoc(), name,
                                                                     ports, interfc, style);
-                design.dump();
+                // design.dump();
                 component->setAttr("dump", func->getAttr("dump"));
 
                 switch (this->style) {
@@ -895,7 +895,7 @@ namespace mlir {
                         } else if (auto returnOp = llvm::dyn_cast<tor::ReturnOp>(user)) {
                             vud.use.push_back(nodes.size() - 1);
                         } else if (auto conditionOp = llvm::dyn_cast<tor::ConditionOp>(user)) {
-                            std::cerr << "Meet a conditionOp" << std::endl;
+                            // std::cerr << "Meet a conditionOp" << std::endl;
                         } else {
                             vud.use.push_back(user->getAttr("starttime")
                                                       .template cast<::mlir::IntegerAttr>()
@@ -965,7 +965,7 @@ namespace mlir {
                                 vud.use.push_back(nodes.size() - 1);
                             } else if (auto conditionOp =
                                     llvm::dyn_cast<tor::ConditionOp>(user)) {
-                                std::cerr << "Meet a conditionOp" << std::endl;
+                                // std::cerr << "Meet a conditionOp" << std::endl;
                             } else {
                                 vud.use.push_back(user->getAttr("starttime")
                                                           .template cast<::mlir::IntegerAttr>()
@@ -1076,7 +1076,7 @@ namespace mlir {
                             break;
                     }
 
-                    std::cerr << std::endl;
+                    // std::cerr << std::endl;
                 }
 
                 allocate_regs();
@@ -1125,27 +1125,27 @@ namespace mlir {
                             }
                             dataflow.analysize();
                             std::vector<unsigned> coloring = dataflow.colorize();
-                            std::cerr << "Coloring: ";
-                            for (auto x : coloring)
-                                std::cerr << x << " ";
-                            std::cerr << std::endl;
+                            // std::cerr << "Coloring: ";
+                            // for (auto x : coloring)
+                                // std::cerr << x << " ";
+                            // std::cerr << std::endl;
 
                             auto old_count = reg_count;
                             unsigned num_new_cols =
                                     *std::max_element(coloring.begin(), coloring.end()) + 1;
 
-                            std::cerr << "# of new colors: " << num_new_cols << std::endl;
+                            // std::cerr << "# of new colors: " << num_new_cols << std::endl;
 
                             for (unsigned j = 0; j < num_new_cols; j++)
                                 registers.push_back(Register(reg_count++, type));
 
-                            std::cerr << "old_count = " << old_count << std::endl;
-                            std::cerr << "new_count = " << reg_count << std::endl;
+                            // std::cerr << "old_count = " << old_count << std::endl;
+                            // std::cerr << "new_count = " << reg_count << std::endl;
                             for (unsigned j = 0, m = vudsSameType.size(); j < m; j++) {
                                 value2Reg[valueUseDefs[vudsSameType[j]].id] =
                                         old_count + coloring[j];
-                                std::cerr << "set value " << valueUseDefs[vudsSameType[j]].id
-                                          << " has reg " << old_count + coloring[j] << "\n";
+                                // std::cerr << "set value " << valueUseDefs[vudsSameType[j]].id
+                                        //   << " has reg " << old_count + coloring[j] << "\n";
                             }
                         }
                     }
@@ -1180,11 +1180,11 @@ namespace mlir {
                         PROCESSCOMB(SelectOp)
 #undef PROCESSCOMB
 
-                        std::cerr << "Value ";
-                        vud.value.dump();
+                        // std::cerr << "Value ";
+                        // vud.value.dump();
                         for (auto use : vud.use) {
-                            std::cerr << "use at " << use << ", depth is " << depth[use]
-                                      << std::endl;
+                            // std::cerr << "use at " << use << ", depth is " << depth[use]
+                                    //   << std::endl;
 
                             endtime = (unsigned) depth[use] > endtime ? depth[use] : endtime;
                         }
@@ -1193,8 +1193,8 @@ namespace mlir {
                             style == Style::PIPELINEFOR)
                             endtime = 0;
 
-                        std::cerr << "starttime is " << starttime << ", endtime is " << endtime
-                                  << std::endl;
+                        // std::cerr << "starttime is " << starttime << ", endtime is " << endtime
+                                //   << std::endl;
 
                         pipelineRegs[vud.id].clear();
 
@@ -1252,8 +1252,8 @@ namespace mlir {
 
                             for (unsigned i = 0, m = idList.size(); i < m; i++) {
                                 cells[idList[i]].cname += "_" + std::to_string(coloring[i]);
-                                std::cerr << "set cell " << idList[i] << " has cname "
-                                          << cells[idList[i]].cname << std::endl;
+                                // std::cerr << "set cell " << idList[i] << " has cname "
+                                        //   << cells[idList[i]].cname << std::endl;
                             }
                         }
                 } else {
@@ -1278,8 +1278,8 @@ namespace mlir {
                             cell_usage[cell.cname].insert(d);
                         }
 
-                        std::cerr << "bind op on node " << cell.t << " with depth " << d
-                                  << " to " << cell.cname << std::endl;
+                        // std::cerr << "bind op on node " << cell.t << " with depth " << d
+                                //   << " to " << cell.cname << std::endl;
                     }
                     //   cell.cname += "_" + std::to_string(cname_count[cell.cname]++);
                 }
@@ -1421,7 +1421,7 @@ namespace mlir {
             }
 
             void gen_regs() {
-                std::cerr << "Generate Registers ----" << std::endl;
+                // std::cerr << "Generate Registers ----" << std::endl;
                 std::set<unsigned> created;
                 for (auto vud : valueUseDefs)
                     if (vud.type != ValueUseDef::Type::Constant &&
@@ -1431,13 +1431,13 @@ namespace mlir {
                         std::string varName;
                         llvm::raw_string_ostream stro(varName);
                         if (vud.value != nullptr) {
-                            vud.value.print(stro);
-                            std::cerr << "Create register for " << varName
-                                      << ", reg_id = " << value2Reg[vud.id] << std::endl;
+                            // vud.value.print(stro);
+                            // std::cerr << "Create register for " << varName
+                            //           << ", reg_id = " << value2Reg[vud.id] << std::endl;
                         }
 
                         if (created.count(value2Reg[vud.id])) {
-                            std::cerr << "Already created, continue" << std::endl;
+                            // std::cerr << "Already created, continue" << std::endl;
                             continue;
                         }
                         created.insert(value2Reg[vud.id]);
@@ -1463,7 +1463,7 @@ namespace mlir {
             }
 
             void gen_calls() {
-                std::cerr << "Generate Calls ----" << std::endl;
+                // std::cerr << "Generate Calls ----" << std::endl;
 
                 std::map<std::string, unsigned long> nameOccupy;
 
@@ -1481,10 +1481,10 @@ namespace mlir {
 
                         auto ports = portDict[callee.str()];
 
-                        std::cerr << "\t" << callee.str() << " : ";
-                        for (auto port : ports)
-                            std::cerr << port.name.getValue().str() << " ";
-                        std::cerr << std::endl;
+                        // std::cerr << "\t" << callee.str() << " : ";
+                        // for (auto port : ports)
+                        //     std::cerr << port.name.getValue().str() << " ";
+                        // std::cerr << std::endl;
 
                         llvm::SmallVector<mlir::Type, 4> types;
                         for (auto port : ports)
@@ -1657,8 +1657,8 @@ namespace mlir {
                     rewriter.create<hec::GotoOp>(trans.getLoc(), next.getValue(), cond);
                 };
 
-                std::cerr << "Now is node " << t << ", tend is " << tend << ", reach is "
-                          << reach << std::endl;
+                // std::cerr << "Now is node " << t << ", tend is " << tend << ", reach is "
+                        //   << reach << std::endl;
                 if (reach == 0 && nodes[t].edges.size() == 1 &&
                     nodes[t].edges[0].to == tend) {
                     state_count += 1;
@@ -1686,26 +1686,26 @@ namespace mlir {
                 auto id = state_count++;
                 size_t ret = 0;
 
-                std::cerr << "StateGen for node " << t << ": ";
-                switch (node.type) {
-                    case TimeNode::NodeT::SEQ:
-                        std::cerr << "SEQ" << std::endl;
-                        break;
-                    case TimeNode::NodeT::CALL:
-                        std::cerr << "CALL" << std::endl;
-                        break;
-                    case TimeNode::NodeT::IF:
-                        std::cerr << "IF" << std::endl;
-                        break;
-                    case TimeNode::NodeT::FOR:
-                        std::cerr << "FOR" << std::endl;
-                        break;
-                    case TimeNode::NodeT::WHILE:
-                        std::cerr << "WHILE" << std::endl;
-                        break;
-                    default:
-                        break;
-                }
+                // std::cerr << "StateGen for node " << t << ": ";
+                // switch (node.type) {
+                //     case TimeNode::NodeT::SEQ:
+                //         // std::cerr << "SEQ" << std::endl;
+                //         break;
+                //     case TimeNode::NodeT::CALL:
+                //         std::cerr << "CALL" << std::endl;
+                //         break;
+                //     case TimeNode::NodeT::IF:
+                //         std::cerr << "IF" << std::endl;
+                //         break;
+                //     case TimeNode::NodeT::FOR:
+                //         std::cerr << "FOR" << std::endl;
+                //         break;
+                //     case TimeNode::NodeT::WHILE:
+                //         std::cerr << "WHILE" << std::endl;
+                //         break;
+                //     default:
+                //         break;
+                // }
                 if (node.type == TimeNode::NodeT::SEQ) {
                     // SEQGen: State generation of SEQ
                     auto state0 = createState(std::to_string(id));
@@ -1783,8 +1783,8 @@ namespace mlir {
                         node.tthen = gen_states(node.edges[0].to, node.tend, 0);
                         node.telse = gen_states(node.edges[1].to, node.tend, 0);
 
-                        std::cerr << "then end is " << node.tthen << ", "
-                                  << "else end is " << node.telse << std::endl;
+                        // std::cerr << "then end is " << node.tthen << ", "
+                        //           << "else end is " << node.telse << std::endl;
 
                         ret = gen_states(node.tend, tend, reach);
 
@@ -1948,8 +1948,8 @@ namespace mlir {
                     auto do_end = gen_states(node.edges[0].to, while_end, reach);
 
                     node.tthen = do_end;
-                    std::cerr << "while_end is " << do_end
-                              << ", state_id = " << node2State[do_end] << std::endl;
+                    // std::cerr << "while_end is " << do_end
+                    //           << ", state_id = " << node2State[do_end] << std::endl;
                     ret = gen_states(while_end, tend, reach);
 
                     auto clock = getClock(node.edges[0]);
@@ -2026,9 +2026,9 @@ namespace mlir {
 
                     rewriter.setInsertionPointAfter(cond);
 
-                    node.val0.dump();
-                    auto val = mapOp2Reg(forop);
-                    val.dump();
+                    // node.val0.dump();
+                    // auto val = mapOp2Reg(forop);
+                    // val.dump();
 
                     auto assign = rewriter.create<hec::AssignOp>(
                             state0.getLoc(), mapOp2Reg(forop), node.val0, nullptr);
@@ -2049,8 +2049,8 @@ namespace mlir {
                     auto do_end = gen_states(node.edges[0].to, for_end, reach);
 
                     node.tthen = do_end;
-                    std::cerr << "for_end is " << do_end
-                              << ", state id = " << node2State[do_end] << std::endl;
+                    // std::cerr << "for_end is " << do_end
+                    //           << ", state id = " << node2State[do_end] << std::endl;
 
                     ret = gen_states(for_end, tend, reach);
 
@@ -2122,7 +2122,7 @@ namespace mlir {
                                 rewriter.create<mlir::ConstantOp>(component.getLoc(), oldattr);
 
                         vud.owner = constop;
-                        constop.dump();
+                        // constop.dump();
                     }
             }
 
@@ -2134,10 +2134,10 @@ namespace mlir {
                             if (pr.first == vud.value)
                                 src = pr.second;
 
-                        std::cerr << "vud.id = " << vud.id
-                                  << " , registerId = " << value2Reg[vud.id] << ": ";
+                        // std::cerr << "vud.id = " << vud.id
+                                //   << " , registerId = " << value2Reg[vud.id] << ": ";
 
-                        registers[value2Reg[vud.id]].op.dump();
+                        // registers[value2Reg[vud.id]].op.dump();
 
                         auto state0 = str2State[std::string("0")];
                         rewriter.setInsertionPoint(&state0.getBody().front().back());
@@ -2165,8 +2165,8 @@ namespace mlir {
             auto insertLoadOp(hec::StateOp state0, hec::StateOp state1, tor::LoadOp load,
                               mlir::Value cond, bool needNot = 0,
                               mlir::Value cond2 = nullptr) {
-                std::cerr << "Insert LoadOp on " << state0.getName().str() << std::endl;
-                load.dump();
+                // std::cerr << "Insert LoadOp on " << state0.getName().str() << std::endl;
+                // load.dump();
 
                 mlir::Value cond0(cond), cond1(cond);
                 if (needNot) {
@@ -2211,7 +2211,7 @@ namespace mlir {
             auto insertStoreOp(hec::StateOp state0, hec::StateOp state1,
                                tor::StoreOp store, mlir::Value cond, bool needNot = 0,
                                mlir::Value cond2 = nullptr) {
-                store.dump();
+                // store.dump();
 
                 mlir::Value cond0(cond), cond1(cond);
                 if (needNot) {
@@ -2252,7 +2252,7 @@ namespace mlir {
             auto insertCmpIOp(hec::StateOp state0, tor::CmpIOp bop,
                               mlir::Value cond = nullptr, bool needNot = 0,
                               std::string str = "") {
-                bop.dump();
+                // bop.dump();
                 mlir::Value cond0(cond);
                 if (needNot)
                     createNot(cond0, cond, state0);
@@ -2273,7 +2273,7 @@ namespace mlir {
                 auto &vud = getVUD(bop.getResult(), bop);
                 vud.wire = newOp.getResult();
 
-                std::cerr << "feed into vud.wire" << std::endl;
+                // std::cerr << "feed into vud.wire" << std::endl;
 
                 rewriter.setInsertionPoint(&state0.getBody().front().back());
                 rewriter.create<hec::AssignOp>(state0.getLoc(), res, newOp.getResult(),
@@ -2284,7 +2284,7 @@ namespace mlir {
             auto insertCombUnaryOp(hec::StateOp state0, OldType bop,
                                    mlir::Value cond = nullptr, bool needNot = 0,
                                    std::string str = "") {
-                bop.dump();
+                // bop.dump();
                 mlir::Value cond0(cond);
                 if (needNot)
                     createNot(cond0, cond, state0);
@@ -2308,7 +2308,7 @@ namespace mlir {
                 auto &vud = getVUD(bop.getResult(), bop);
                 vud.wire = newOp.getResult();
 
-                std::cerr << "feed into vud.wire" << std::endl;
+                // std::cerr << "feed into vud.wire" << std::endl;
 
                 rewriter.setInsertionPoint(&state0.getBody().front().back());
                 rewriter.create<hec::AssignOp>(state0.getLoc(), res, newOp.getResult(),
@@ -2319,7 +2319,7 @@ namespace mlir {
             auto insertCombBinaryOp(hec::StateOp state0, OldType bop,
                                     mlir::Value cond = nullptr, bool needNot = 0,
                                     std::string str = "") {
-                bop.dump();
+                // bop.dump();
                 mlir::Value cond0(cond);
                 if (needNot)
                     createNot(cond0, cond, state0);
@@ -2345,7 +2345,7 @@ namespace mlir {
                 auto &vud = getVUD(bop.getResult(), bop);
                 vud.wire = newOp.getResult();
 
-                std::cerr << "feed into vud.wire" << std::endl;
+                // std::cerr << "feed into vud.wire" << std::endl;
 
                 rewriter.setInsertionPoint(&state0.getBody().front().back());
                 rewriter.create<hec::AssignOp>(state0.getLoc(), res, newOp.getResult(),
@@ -2355,7 +2355,7 @@ namespace mlir {
             auto insertSelectOp(hec::StateOp state0, SelectOp bop,
                                 mlir::Value cond = nullptr, bool needNot = 0,
                                 std::string str = "") {
-                bop.dump();
+                // bop.dump();
                 mlir::Value cond0(cond);
                 if (needNot)
                     createNot(cond0, cond, state0);
@@ -2382,7 +2382,7 @@ namespace mlir {
                 auto &vud = getVUD(bop.getResult(), bop);
                 vud.wire = newOp.getResult();
 
-                std::cerr << "feed into vud.wire" << std::endl;
+                // std::cerr << "feed into vud.wire" << std::endl;
 
                 rewriter.setInsertionPoint(&state0.getBody().front().back());
                 rewriter.create<hec::AssignOp>(state0.getLoc(), res, newOp.getResult(),
@@ -2393,7 +2393,7 @@ namespace mlir {
             auto insertMultiCycleUnaryOp(hec::StateOp state0, hec::StateOp state1,
                                          OpType bop, mlir::Value cond, bool needNot = 0,
                                          mlir::Value cond2 = nullptr) {
-                bop.dump();
+                // bop.dump();
 
                 mlir::Value cond0(cond), cond1(cond);
 
@@ -2413,10 +2413,10 @@ namespace mlir {
                 auto res =
                         mapValue(bop.getResult(),
                                  bop->template getAttrOfType<IntegerAttr>("endtime").getInt());
-                res.dump();
+                // res.dump();
 
                 auto primitive = getCellByOp(bop).primitive;
-                primitive.dump();
+                // primitive.dump();
 
                 auto &vud = getVUD(bop.getResult(), bop);
                 vud.wire = primitive.getResult(1);
@@ -2433,7 +2433,7 @@ namespace mlir {
             auto insertMultiCycleBinaryOp(hec::StateOp state0, hec::StateOp state1,
                                           OpType bop, mlir::Value cond, bool needNot = 0,
                                           mlir::Value cond2 = nullptr) {
-                bop.dump();
+                // bop.dump();
 
                 mlir::Value cond0(cond), cond1(cond);
 
@@ -2456,10 +2456,10 @@ namespace mlir {
                 auto res =
                         mapValue(bop.getResult(),
                                  bop->template getAttrOfType<IntegerAttr>("endtime").getInt());
-                res.dump();
+                // res.dump();
 
                 auto primitive = getCellByOp(bop).primitive;
-                primitive.dump();
+                // primitive.dump();
 
                 auto &vud = getVUD(bop.getResult(), bop);
                 vud.wire = primitive.getResult(2);
@@ -2548,7 +2548,7 @@ namespace mlir {
                     insertLoadOp(state0, state1, load, nullptr);
                 if (auto store = llvm::dyn_cast<tor::StoreOp>(op))
                     insertStoreOp(state0, state1, store, nullptr);
-                std::cerr << std::endl;
+                // std::cerr << std::endl;
             }
 
             auto insertCallOp(size_t t) {
@@ -2670,7 +2670,7 @@ namespace mlir {
                                               mapValue(ifop.getCondition(), t));
                         }
 
-                    std::cerr << "yield then at node " << node.tthen << std::endl;
+                    // std::cerr << "yield then at node " << node.tthen << std::endl;
                     auto &state_then_end = str2State[std::to_string(node2State[node.tthen])];
                     auto yield = llvm::dyn_cast<tor::YieldOp>(
                             ifop.getThenRegion().back().getTerminator());
@@ -2937,8 +2937,8 @@ namespace mlir {
                         whileop.getRegion(1).back().getTerminator());
                 auto ptrItr = whileop.getRegion(1).getArguments().begin();
 
-                yield.dump();
-                ptrItr->dump();
+                // yield.dump();
+                // ptrItr->dump();
 
                 bool isCond = 0;
                 for (auto operand : yield.getOperands()) {
@@ -3094,11 +3094,11 @@ namespace mlir {
 
                 auto ptrItr = forop.getRegionIterArgs().begin();
 
-                yield.dump();
+                // yield.dump();
 
                 for (auto operand : yield.getOperands()) {
-                    std::cerr << "!!!!!" << std::endl;
-                    (*ptrItr).dump();
+                    // std::cerr << "!!!!!" << std::endl;
+                    // (*ptrItr).dump();
 
                     rewriter.setInsertionPoint(&state_do_end.getBody().front().back());
                     rewriter.create<hec::AssignOp>(state_do_end.getLoc(),
@@ -3148,13 +3148,13 @@ namespace mlir {
                 if (state_count > 1)
                     gen_argument_backup();
 
-                std::cerr << "OpGen" << std::endl;
+                // std::cerr << "OpGen" << std::endl;
 
                 // component.dump();
 
                 for (size_t i = 0; i < nodes.size(); i++) {
                     auto &node = nodes.at(topo[i]);
-                    std::cerr << "Node " << i << " ----" << std::endl;
+                    // std::cerr << "Node " << i << " ----" << std::endl;
                     switch (node.type) {
                         case TimeNode::NodeT::SEQ:
                             for (auto opOnEdge : node.opsOnEdge) {
@@ -3220,10 +3220,10 @@ namespace mlir {
 
                 // func.dump();
 
-                std::cerr << "Topo: ";
-                for (auto x : topo)
-                    std::cerr << x << " ";
-                std::cerr << std::endl;
+                // std::cerr << "Topo: ";
+                // for (auto x : topo)
+                //     std::cerr << x << " ";
+                // std::cerr << std::endl;
 
                 switch (style) {
                     case Style::PIPELINEFOR:
@@ -3289,26 +3289,26 @@ namespace mlir {
             }
 
             mlir::Value map_value_stage(mlir::Value value, unsigned stage) {
-                std::cerr << "map_value_stage on stage " << stage << " :";
-                value.dump();
+                // std::cerr << "map_value_stage on stage " << stage << " :";
+                // value.dump();
                 mlir::Value ret;
                 for (auto &vud : this->valueUseDefs)
                     if (vud.value == value) {
-                        std::cerr << "\tfound vud : " << vud.id << std::endl;
-                        std::cerr << "\tpipelineRegs's size is " << pipelineRegs[vud.id].size()
-                                  << std::endl;
+                        // std::cerr << "\tfound vud : " << vud.id << std::endl;
+                        // std::cerr << "\tpipelineRegs's size is " << pipelineRegs[vud.id].size()
+                        //           << std::endl;
                         if (pipelineRegs[vud.id].count(stage) == 0) {
-                            std::cerr << "\tregister not found:  "
-                                      << (pipelineRegs[vud.id].empty()
-                                          ? "pipelineReg is empty"
-                                          : std::to_string(stage) + " out of [" +
-                                            std::to_string(
-                                                    pipelineRegs[vud.id].begin()->first) +
-                                            ", " +
-                                            std::to_string(
-                                                    pipelineRegs[vud.id].rbegin()->first) +
-                                            "]")
-                                      << std::endl;
+                            // std::cerr << "\tregister not found:  "
+                            //           << (pipelineRegs[vud.id].empty()
+                            //               ? "pipelineReg is empty"
+                            //               : std::to_string(stage) + " out of [" +
+                            //                 std::to_string(
+                            //                         pipelineRegs[vud.id].begin()->first) +
+                            //                 ", " +
+                            //                 std::to_string(
+                            //                         pipelineRegs[vud.id].rbegin()->first) +
+                            //                 "]")
+                            //           << std::endl;
                             if (vud.type == ValueUseDef::Type::Argument) {
                                 // for (auto pr : arg2arg)
                                 //   if (pr.first == value)
@@ -3322,9 +3322,9 @@ namespace mlir {
                                 ret = nullptr;
                             }
                         } else {
-                            std::cerr << "\tregister found "; // << std::endl;
+                            // std::cerr << "\tregister found "; // << std::endl;
                             ret = registers[pipelineRegs[vud.id][stage]].op.getResult(0);
-                            ret.dump();
+                            // ret.dump();
                         }
                         break;
                     }
@@ -3337,8 +3337,8 @@ namespace mlir {
             }
 
             mlir::Value gen_guard(unsigned from, unsigned to, unsigned stage) {
-                std::cerr << "gen_guard for " << from << " -> " << to << " on stage "
-                          << stage << std::endl;
+                // std::cerr << "gen_guard for " << from << " -> " << to << " on stage "
+                //           << stage << std::endl;
                 auto stageop = cycles[stage].stageop;
                 auto get_value_stage = [&](mlir::Value value, bool rev) {
                     mlir::Value ret = map_value_stage(value, stage);
@@ -3380,10 +3380,10 @@ namespace mlir {
                 };
 
                 auto guardVec = guards[from];
-                for (auto pr : guardVec) {
-                    std::cerr << "\t";
-                    pr.first.dump();
-                }
+                // for (auto pr : guardVec) {
+                    // std::cerr << "\t";
+                    // pr.first.dump();
+                // }
                 if (nodes[from].type == TimeNode::NodeT::IF) {
                     auto ifop = llvm::dyn_cast<tor::IfOp>(nodes[from].op);
                     guardVec.push_back(
@@ -3392,7 +3392,7 @@ namespace mlir {
 
                 mlir::Value guard;
                 if (guardVec.empty()) {
-                    std::cerr << "no guard" << std::endl;
+                    // std::cerr << "no guard" << std::endl;
                     guard = nullptr;
                 } else {
                     guard = get_value_stage(guardVec.front().first, guardVec.front().second);
@@ -3504,8 +3504,8 @@ namespace mlir {
             template<typename OpType>
             void gen_MultiCycleUnaryOp_on_stage(unsigned from, unsigned to, OpType op,
                                                 unsigned startstage, unsigned endstage) {
-                op->dump();
-                std::cerr << startstage << ", " << endstage << std::endl;
+                // op->dump();
+                // std::cerr << startstage << ", " << endstage << std::endl;
 
                 assert(startstage < endstage);
                 auto guard0 = gen_guard(from, to, startstage);
@@ -3535,8 +3535,8 @@ namespace mlir {
             template<typename OpType>
             void gen_MultiCycleOp_on_stage(unsigned from, unsigned to, OpType op,
                                            unsigned startstage, unsigned endstage) {
-                op->dump();
-                std::cerr << startstage << ", " << endstage << std::endl;
+                // op->dump();
+                // std::cerr << startstage << ", " << endstage << std::endl;
 
                 assert(startstage < endstage);
                 auto guard0 = gen_guard(from, to, startstage);
@@ -3650,8 +3650,8 @@ namespace mlir {
 
             void gen_op_on_stage(unsigned from, unsigned to, mlir::Operation *op,
                                  unsigned startstage, unsigned endstage) {
-                std::cerr << "gen_op_on_stage (" << startstage << ", " << endstage << "): ";
-                op->dump();
+                // std::cerr << "gen_op_on_stage (" << startstage << ", " << endstage << "): ";
+                // op->dump();
 
 #define GENCOMB(OldType, NewType)                                              \
   if (auto sop = llvm::dyn_cast<OldType>(op))                                  \
@@ -3757,9 +3757,9 @@ namespace mlir {
                             x.wire = inductionWire;
 
                     for (unsigned j = 0; j < component.getNumInPorts() - 1; j++) {
-                        component.getArgument(j).dump();
-                        std::cerr << "the id for argument " << j << " is "
-                                  << findVUD(func.getArgument(j)).id << std::endl;
+                        // component.getArgument(j).dump();
+                        // std::cerr << "the id for argument " << j << " is "
+                                //   << findVUD(func.getArgument(j)).id << std::endl;
                         rewriter.setInsertionPoint(stageset);
                         rewriter.create<hec::InitOp>(
                                 component.getLoc(),
@@ -3798,9 +3798,9 @@ namespace mlir {
                     }
                 } else {
                     for (unsigned j = 0; j < component.getNumInPorts() - 1; j++) {
-                        component.getArgument(j).dump();
-                        std::cerr << "the id for argument " << j << " is "
-                                  << findVUD(func.getArgument(j)).id << std::endl;
+                        // component.getArgument(j).dump();
+                        // std::cerr << "the id for argument " << j << " is "
+                                //   << findVUD(func.getArgument(j)).id << std::endl;
                         rewriter.setInsertionPoint(stageset);
                         rewriter.create<hec::InitOp>(
                                 component.getLoc(),
@@ -3828,9 +3828,9 @@ namespace mlir {
                         }
 
                         if (node.type == TimeNode::NodeT::IF) {
-                            std::cerr << "meet if-end";
+                            // std::cerr << "meet if-end";
                             auto stage = depth[node.tend];
-                            std::cerr << " put it at stage " << stage - 1 << std::endl;
+                            // std::cerr << " put it at stage " << stage - 1 << std::endl;
                             cycles[stage - 1].reviewIds.push_back(nodeid);
                         }
                     }
@@ -3839,7 +3839,7 @@ namespace mlir {
                         auto &node = nodes.at(nodeid);
                         assert(node.type == TimeNode::NodeT::IF);
                         auto stage = depth[node.tend];
-                        std::cerr << "process if at stage " << stage - 1 << std::endl;
+                        // std::cerr << "process if at stage " << stage - 1 << std::endl;
                         auto stageop = cycles[stage - 1].stageop;
                         auto ifop = llvm::dyn_cast<tor::IfOp>(node.op);
                         auto &node_end = nodes.at(node.tend);
@@ -3851,8 +3851,8 @@ namespace mlir {
                             rewriter.setInsertionPointToEnd(&(stageop.getBody().front()));
                             auto guard =
                                     gen_guard(node_end.backEdges[0].from, node.tend, stage - 1);
-                            std::cerr << "guard: ";
-                            guard.dump();
+                            // std::cerr << "guard: ";
+                            // guard.dump();
 
                             auto dest = map_value_stage(res, stage);
                             auto src = map_value_stage(*ptr, stage - 1);
@@ -3889,7 +3889,7 @@ namespace mlir {
                     rewriter.create<hec::YieldOp>(stageop.getLoc(),
                                                   mlir::ValueRange(results));
                 } else {
-                    std::cerr << "???" << std::endl;
+                    // std::cerr << "???" << std::endl;
                     // component.dump();
                     auto node = nodes.at(0);
                     auto forop = llvm::dyn_cast<tor::ForOp>(node.op);
@@ -3915,9 +3915,9 @@ namespace mlir {
                             assert(0 && "return weird value");
                     }
 
-                    for (auto pr : res2ret) {
-                        std::cerr << "return " << pr.first << " to " << pr.second << std::endl;
-                    }
+                    // for (auto pr : res2ret) {
+                        // std::cerr << "return " << pr.first << " to " << pr.second << std::endl;
+                    // }
 
                     for (size_t i = 0; i < yieldop.getResults().size(); i++) {
                         auto res = yieldop->getOperand(i);
@@ -3926,7 +3926,7 @@ namespace mlir {
                         ValueUseDef vud_ =
                                 findVUD(forop.getRegionIterArgs().take_front(i + 1).back());
 
-                        forop.getRegionIterArgs().take_front(i + 1).back().dump();
+                        // forop.getRegionIterArgs().take_front(i + 1).back().dump();
 
                         auto stage = depth[vud.def];
 #define COMB(type)                                                             \
@@ -3945,10 +3945,10 @@ namespace mlir {
                         COMB(SelectOp)
 #undef COMB
 
-                        std::cerr << "stage is " << stage << std::endl;
+                        // std::cerr << "stage is " << stage << std::endl;
                         auto stageop = cycles[stage].stageop;
 
-                        stageop.dump();
+                        // stageop.dump();
 
                         auto II = component->getAttrOfType<IntegerAttr>("II").getInt();
 
@@ -4024,8 +4024,8 @@ namespace mlir {
                         }
 
                 for (auto op : toErase) {
-                    std::cerr << "erase ";
-                    op.dump();
+                    // std::cerr << "erase ";
+                    // op.dump();
                     rewriter.eraseOp(op);
                 }
                 toErase.clear();
@@ -4076,7 +4076,7 @@ namespace mlir {
                     if (isEmpty()) {
                         unsigned stagetoerase =
                                 std::stoi(cycleptr->stageop.getName().drop_front().str());
-                        std::cerr << "Erase stage " << stagetoerase << std::endl;
+                        // std::cerr << "Erase stage " << stagetoerase << std::endl;
                         for (auto &op : component.getBody().front())
                             if (auto reg = llvm::dyn_cast<hec::PrimitiveOp>(op)) {
                                 auto regname = reg.getInstanceName();
@@ -4182,12 +4182,12 @@ namespace mlir {
             }
 
             void gen_STG(mlir::hec::DesignOp design, mlir::PatternRewriter &rewriter) {
-                std::cerr << "the size of nodes is " << nodes.size() << std::endl;
+                // std::cerr << "the size of nodes is " << nodes.size() << std::endl;
                 auto STGptr = new STG(funcOp, nodes, glbStorage, portDict, rewriter);
                 STGptr->codegen(design);
 
-                std::cerr << "## Generated STG for component " << symbol.str() << std::endl
-                          << std::endl;
+                // std::cerr << "## Generated STG for component " << symbol.str() << std::endl
+                        //   << std::endl;
             }
 
             // void gen_Graph(mlir::hec::DesignOp design, mlir::PatternRewriter &rewriter)
@@ -4199,7 +4199,7 @@ namespace mlir {
                     std::map<std::string, llvm::SmallVector<mlir::hec::ComponentPortInfo, 4>>
                     portDict)
                     : glbStorage(storage), portDict(portDict) {
-                std::cerr << "Parse FuncOp : " << (std::string) func.getName() << std::endl;
+                // std::cerr << "Parse FuncOp : " << (std::string) func.getName() << std::endl;
                 funcOp = func;
                 symbol = func.getName();
 
@@ -4331,14 +4331,14 @@ namespace mlir {
                         nodes[forOp.getStarttime()].type = TimeNode::NodeT::FOR;
                     }
                 });
-                dbg_print_timeGraph();
+                // dbg_print_timeGraph();
             }
 
             void rewrite(mlir::hec::DesignOp design, mlir::PatternRewriter &rewriter) {
-                std::cerr << std::endl
-                          << "Rewrite component for FuncOp " << (std::string) this->symbol
-                          << " in " << (style == Style::STG ? "STG" : "GRAPH") << " style"
-                          << std::endl;
+                // std::cerr << std::endl
+                //           << "Rewrite component for FuncOp " << (std::string) this->symbol
+                //           << " in " << (style == Style::STG ? "STG" : "GRAPH") << " style"
+                //           << std::endl;
                 // if (style == Style::STG)
                 gen_STG(design, rewriter);
                 // else

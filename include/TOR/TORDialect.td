@@ -13,9 +13,11 @@ def TORDialect : Dialect {
   let cppNamespace = "::mlir::tor";
 
   let useDefaultTypePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
   let extraClassDeclaration = [{
     // Register all RTL types.
     void registerTypes();
+    void registerAttributes();
   }];
 }
 

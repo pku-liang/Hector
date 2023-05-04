@@ -1,6 +1,7 @@
 #include "TOR/TORDialect.h"
 #include "TOR/TOR.h"
 #include "TOR/TORTypes.h"
+#include "TOR/TORAttrs.h"
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -32,6 +33,9 @@ using namespace mlir::tor;
 void TORDialect::initialize()
 {
   registerTypes();
+
+  registerAttributes();
+  
   addOperations<
 #define GET_OP_LIST
 #include "TOR/TOR.cpp.inc"

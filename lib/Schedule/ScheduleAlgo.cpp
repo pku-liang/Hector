@@ -326,17 +326,6 @@ void ScheduleBase::buildDFG() {
       if (Distance == -1 && canReach(memop1, memop2, true))
         Distance = 1;
 
-      // first check if memop1 can reach memop2 without taking loop-back edge
-      // if (canReachBB(memop1->getParentBB(),
-      //                memop2->getParentBB(),
-      //                [&](ControlEdge succ){return succ.type !=
-      //                ControlEdge::LOOPBACK;}))
-      //   Distance = 0;
-      // // check if memop1 can reach memop2 using loop-back edge. pessimiticaly
-      // set the distance to 1 if (Distance == -1 &&
-      // canReachBB(memop1->getParentBB(), memop2->getParentBB()))
-      //   Distance = 1;
-
       // memop1 can't reach memop2 (e.g. mutually exclusive branch of an if statement)
       if (Distance == -1)
         continue;

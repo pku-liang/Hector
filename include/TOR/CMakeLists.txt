@@ -5,6 +5,8 @@ add_public_tablegen_target(MLIRTORPassIncGen)
 set(LLVM_TARGET_DEFINITIONS TOR.td)
 mlir_tablegen(TOREnums.h.inc -gen-enum-decls)
 mlir_tablegen(TOREnums.cpp.inc -gen-enum-defs)
+mlir_tablegen(TORAttrs.h.inc -gen-attrdef-decls)
+mlir_tablegen(TORAttrs.cpp.inc -gen-attrdef-defs) 
 add_public_tablegen_target(MLIRTOREnumsIncGen)
 
 add_mlir_dialect(TOR tor)

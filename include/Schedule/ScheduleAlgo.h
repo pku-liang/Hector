@@ -70,7 +70,7 @@ public:
   /// verify resource constraints and dependencies
   virtual LogicalResult verify();
 
-  virtual void buildFromContaingOp();
+  virtual void buildFromContainingOp();
   
   OpAbstract *createOp(Operation *op, Loop *ParentLoop, BasicBlock *ParentBB, 
                        ArrayRef<Value> Results, ArrayRef<Value> Operands, 
@@ -109,7 +109,7 @@ public:
   
   OpAbstract *createMemOp(Operation *op, Loop *ParentLoop, BasicBlock *ParentBB,
                           ArrayRef<Value> Results, ArrayRef<Value> Operands,
-                          OpAbstract::OpType type)
+                          OpAbstract::OpType type, ArrayRef<int> DepSigs, ArrayRef<int> DepDists)
   {
     int rsc = RDB.getResourceID("memport");
     Operations.push_back(
@@ -126,6 +126,10 @@ public:
     
     OpAbstract *newop = Operations.back().get();
     newop->setWidth(width);
+    
+    auto newMemop = newop->getMemOp();
+    for (unsigned i = 0; i < DepSigs.size(); ++i)
+      newMemop->Dependences[DepSigs[i]] = DepDists[i];
 
     return newop;
   }

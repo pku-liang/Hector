@@ -18,10 +18,10 @@ module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i6
       scf.for %arg3 = %c0 to %c63 step %c1 {
         %idx1 = arith.subi %arg3, %c3 : index
         %idx2 = arith.subi %arg3, %c4 : index
-        %a = tor.load %f[%idx1] on (0 to 0) {t=#tor.dep<(2), (3)>} : !tor.memref<64xi32, [], "rw">[index]
-        %b = tor.load %f[%idx2] on (0 to 0) {d=#tor.dep<(1), (2)>}: !tor.memref<64xi32, [], "rw">[index]
+        %a = tor.load %f[%idx1] on (0 to 0) {dependence=#tor.dep<(1), (3)>} : !tor.memref<64xi32, [], "rw">[index]
+        %b = tor.load %f[%idx2] on (0 to 0) {dependence=#tor.dep<(2), (4)>}: !tor.memref<64xi32, [], "rw">[index]
         %s = arith.addi %a, %b : i32
-        tor.store %s to %f[%arg3] on (0 to 0) {d=#tor.dep<(1, 2), (2, 3)>}: (i32, !tor.memref<64xi32, [], "rw">[index])
+        tor.store %s to %f[%arg3] on (0 to 0) {dependence=#tor.dep<(1, 2), (3, 4)>}: (i32, !tor.memref<64xi32, [], "rw">[index])
       } {pipeline=1, II=1}
       tor.return
     }

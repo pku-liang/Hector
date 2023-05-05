@@ -104,26 +104,26 @@ void SDCSchedule::formulateDependency(Loop *L, int II, SDCSolver *SDC) {
       for (auto pred : op->getPred())
         if (sameLoop(pred)) {
           auto srcOp = llvm::dyn_cast<SDCOpWrapper>(pred->SourceOp);
-	  int RId = srcOp->getResource();
+	        int RId = srcOp->getResource();
           int Lat = RDB.getLatency(RId);
 
-	  // This special case is because of codegen backend
-	  if (srcOp->getType() == OpAbstract::OpType::PHI_OP)
-	    Lat = 1;
-          if (Lat == 0) {
-            if (RDB.getLatency(destOp->getResource()) == 0)
+	        // This special case is because of codegen backend
+          if (srcOp->getType() == OpAbstract::OpType::PHI_OP)
+            Lat = 1;
+            if (Lat == 0) {
+              if (RDB.getLatency(destOp->getResource()) == 0)
+                SDC->addInitialConstraint(Constraint::CreateGE(
+                    destOp->VarId, srcOp->VarId, -II * pred->Distance));
+              else
+                SDC->addInitialConstraint(Constraint::CreateGE(
+                    destOp->VarId, srcOp->VarId, 1 - II * pred->Distance));
+            } else {
               SDC->addInitialConstraint(Constraint::CreateGE(
-                  destOp->VarId, srcOp->VarId, -II * pred->Distance));
-            else
-              SDC->addInitialConstraint(Constraint::CreateGE(
-                  destOp->VarId, srcOp->VarId, 1 - II * pred->Distance));
-          } else {
-            SDC->addInitialConstraint(Constraint::CreateGE(
-                destOp->VarId, srcOp->VarId, Lat - II * pred->Distance));
-          }
-          // srcOp->printName(llvm::outs());
-          // destOp->printName(llvm::outs());
-          // llvm::outs() << Lat << " " << pred->Distance << "\n";
+                  destOp->VarId, srcOp->VarId, Lat - II * pred->Distance));
+            }
+              // srcOp->printName(llvm::outs());
+              // destOp->printName(llvm::outs());
+              // llvm::outs() << Lat << " " << pred->Distance << "\n";
         }
     }
 
@@ -335,8 +335,13 @@ bool SDCSchedule::resolveResConstraint(Loop *L, int II, SDCSolver *SDC) {
             // sdc op after dist iteraions.
 
             if (hasMemPortConflict(op, sdcOp.first, dist)) {
-              avail = false;
-              break;
+              for (int i = 0; i < RDB.getII(RId); ++i)
+                if (ResTable[RId][(s + i) % II] >= ResLimit[RId]) {
+                  avail = false;
+                  break;
+                }
+              if (avail == false)
+                break;
             }
           }
         } else {
@@ -1122,7 +1127,7 @@ bool SDCSchedule::pipelineFunction() {
 }
 
 LogicalResult SDCSchedule::runSchedule() {
-  buildFromContaingOp();
+  buildFromContainingOp();
 
   SDCOperations = initSchedule<SDCOpWrapper>();
   

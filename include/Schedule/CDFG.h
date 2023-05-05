@@ -240,6 +240,7 @@ public:
           1); // the first index is the address in the memory bank
       partitionIndices = storeOp.getIndices().drop_front(1);
     }
+    Dependences.clear();
     llvm::outs() << partitionIndices.size() << "\n";
   }
 
@@ -247,6 +248,7 @@ public:
     return type == OpType::LOAD_OP || type == OpType::STORE_OP;
   }
 
+  std::unordered_map<int, int> Dependences;  
 private:
   Value memref;
   Value addr;

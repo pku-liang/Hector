@@ -8,6 +8,7 @@
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Schedule/ScheduleAlgo.h"
+#include "TOR/TORAttrs.h"
 
 namespace scheduling {
 
@@ -163,10 +164,23 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
     } else if (auto loadOp = llvm::dyn_cast<tor::LoadOp>(op)) {
 
       Value result = loadOp.getResult();
+      
+      ArrayRef<int> signatures;
+      ArrayRef<int> distances;
+
+      if (loadOp.getOperation()->hasAttr("dependence")) {
+        auto deps = loadOp.getOperation()->getAttr("dependence").cast<tor::DependenceAttr>();
+        signatures = deps.getSignatures();
+        distances = deps.getDistances();
+      } else {
+        signatures = SmallVector<int, 2>();
+        distances = SmallVector<int, 2>();
+      }
+
       OpAbstract *newOpA = createMemOp(&op, parentLoop, lastHead, 
                                     std::vector<Value>{result},
                                     std::vector<Value>{loadOp.getIndices().begin(), loadOp.getIndices().end()},
-                                    OpAbstract::OpType::LOAD_OP);
+                                    OpAbstract::OpType::LOAD_OP, signatures, distances);
       ValueMap[result] = newOpA;
       OperationMap[&op] = newOpA;
       lastHead->addOperation(newOpA);
@@ -178,11 +192,24 @@ std::pair<BasicBlock*, BasicBlock*> ScheduleBase::buildCFG(Block &block, Loop *p
 				  storeOp.getIndices().end()
       };
       operands.push_back(storeOp.getValue());
-      
+
+      ArrayRef<int> signatures;
+      ArrayRef<int> distances;
+
+      if (storeOp.getOperation()->hasAttr("dependence")) {
+        auto deps = storeOp.getOperation()->getAttr("dependence").cast<tor::DependenceAttr>();
+        signatures = deps.getSignatures();
+        distances = deps.getDistances();
+      } else {
+        signatures = SmallVector<int, 2>();
+        distances = SmallVector<int, 2>();
+      }
+
       OpAbstract *newOpA = createMemOp(&op, parentLoop, lastHead,
 				       std::vector<Value>{mem},
 				       operands,
-				       OpAbstract::OpType::STORE_OP);
+				       OpAbstract::OpType::STORE_OP,
+               signatures, distances);
       OperationMap[&op] = newOpA;
       lastHead->addOperation(newOpA);
     } else if (auto forOp = llvm::dyn_cast<tor::ForOp>(op)) {
@@ -316,31 +343,29 @@ void ScheduleBase::buildDFG() {
       
       // check if the effect of memop1 while reach memop2
       int Distance = -1;
+      bool annotated = false;
 
+      for (auto d1 : memop1->Dependences) {
+        if (memop2->Dependences.find(d1.first) != memop2->Dependences.end()) {
+          Distance = d1.second;
+          annotated = true;
+          break;   
+        }
+      } 
+      
       // memop1 can reach memop2 without loop-back edge
-      if (canReach(memop1, memop2, false))
+      if (!annotated && canReach(memop1, memop2, false))
         Distance = 0;
 
       // memop1 can reach memop2 using some loop-back edge,
       // pessimiticaly assume distance to be 1
-      if (Distance == -1 && canReach(memop1, memop2, true))
+      if (!annotated && Distance == -1 && canReach(memop1, memop2, true))
         Distance = 1;
-
-      // first check if memop1 can reach memop2 without taking loop-back edge
-      // if (canReachBB(memop1->getParentBB(),
-      //                memop2->getParentBB(),
-      //                [&](ControlEdge succ){return succ.type !=
-      //                ControlEdge::LOOPBACK;}))
-      //   Distance = 0;
-      // // check if memop1 can reach memop2 using loop-back edge. pessimiticaly
-      // set the distance to 1 if (Distance == -1 &&
-      // canReachBB(memop1->getParentBB(), memop2->getParentBB()))
-      //   Distance = 1;
 
       // memop1 can't reach memop2 (e.g. mutually exclusive branch of an if statement)
       if (Distance == -1)
         continue;
-      
+
       if (op1->getType() == OpAbstract::OpType::LOAD_OP &&
           op2->getType() == OpAbstract::OpType::LOAD_OP) 
       {
@@ -366,7 +391,7 @@ void ScheduleBase::buildDFG() {
   }
 }
 
-void ScheduleBase::buildFromContaingOp() {
+void ScheduleBase::buildFromContainingOp() {
   if (auto funcOp = llvm::dyn_cast<tor::FuncOp>(containingOp)) {
     /// instantiate a funOp
     Region &region = funcOp.getBody();

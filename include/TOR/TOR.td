@@ -19,5 +19,6 @@ include "TORStmt.td"
 
 include "TORExpr.td"
 
+include "TORAttrs.td"
 
 #endif // TOR_OPS_TD

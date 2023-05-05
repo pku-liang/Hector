@@ -6,7 +6,7 @@
 
 // Base class for other typedefs. Provides dialact-specific defaults.
 
-class TOR_Type<string name, string baseCppClass = "::mlir::tor::Type"> 
+class TOR_Type<string name, string baseCppClass = "::mlir::Type"> 
     : TypeDef<TORDialect, name, [], baseCppClass> {
   let mnemonic = ?;
 }

@@ -61,9 +61,9 @@
   },
   "memport": {
     "delay": [0, 0, 0, 0, 0, 0, 0],
-    "latency": 2,
-    "II": 2,
-    "amount": 1
+    "latency": 1,
+    "II": 1,
+    "amount": 3
   },
 
   "sitofp": {

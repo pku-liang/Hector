@@ -38,7 +38,7 @@ namespace {
 
     struct FuncOpPattern : public OpConversionPattern<FuncOp> {
         FuncOpPattern(MLIRContext *ctx, std::string top_function, std::string resource, double clock)
-                : OpConversionPattern<FuncOp>(ctx), top_function(top_function), clock(clock), resource(resource)  {}
+                : OpConversionPattern<FuncOp>(ctx), top_function(top_function), resource(resource), clock(clock)  {}
 
         LogicalResult
         matchAndRewrite(FuncOp op, FuncOp::Adaptor adaptor,

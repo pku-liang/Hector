@@ -2,6 +2,7 @@
 #define TOR_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/Dialect/Func/IR/FuncOps.td"
 
 def TORSchedule : Pass<"schedule-tor", "mlir::tor::DesignOp"> {
   let summary = "Lower std+scf+affine to tor, schedule a time graph";
@@ -41,6 +42,15 @@ def ConvertInput : Pass<"convert-input", "mlir::ModuleOp"> {
     Option<"top_function", "top-function", "std::string", "\"main\"", "The top function name">,
     Option<"clock", "clock", "double", "6.0", "Clock cycle">,
     Option<"resource", "resource", "std::string", "\"./resource_dynamatic.json\"", "Resource file">,
+  ];
+}
+
+def ArrayPartition : Pass<"array-partition", "mlir::func::FuncOp"> {
+  let summary = "Array partition";
+  let constructor = "mlir::createArrayPartitionPass()";
+  let dependentDialects = ["mlir::func::FuncDialect"];
+  let options = [
+    Option<"factor", "factor", "int", "4", "Partition factor">,
   ];
 }
 

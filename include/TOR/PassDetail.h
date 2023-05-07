@@ -3,6 +3,7 @@
 
 #include "mlir/Pass/Pass.h"
 #include "TOR/TOR.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir
 {

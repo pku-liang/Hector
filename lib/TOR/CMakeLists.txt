@@ -9,6 +9,7 @@ add_mlir_dialect_library(MLIRTOR
     TORDump.cpp
     ConvertInput.cpp
     TORAttrs.cpp
+    ArrayPartition.cpp
     
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TOR

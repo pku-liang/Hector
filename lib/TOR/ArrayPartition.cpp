@@ -47,7 +47,8 @@ namespace {
             return getAffineDimExpr(get_idx(idx), rewriter.getContext());
         } else if (auto apply = dyn_cast<AffineApplyOp>(idx.getDefiningOp())) {
             auto map = apply.getAffineMap();
-            return map.getResult(0);
+            auto new_map = AffineMap::get(arg_num.size(), 0, get_bank_expr(apply.getMapOperands()[0], rewriter));
+            return map.getResult(0).compose(new_map);
         } else if (auto constant = dyn_cast<arith::ConstantIntOp>(idx.getDefiningOp())) {
             return getAffineConstantExpr(constant.value(), rewriter.getContext());
         } else if (auto constant = dyn_cast<arith::ConstantIndexOp>(idx.getDefiningOp())) {
@@ -80,30 +81,49 @@ namespace {
         }
     }
 
-    int get_bank(Value idx, PatternRewriter &rewriter, int factor) {
+    int get_bank(Value idx, PatternRewriter &rewriter, int factor, bool cyclic) {
         auto expr = get_bank_expr(idx, rewriter);
         if (!expr) {
             return -1;
         }
-        expr = expr % factor;
+        if (cyclic) {
+            expr = expr % factor;
+        } else {
+            expr = expr.floorDiv(factor);
+        }
         auto map = AffineMap::get(arg_num.size(), 0, expr);
+        // idx.dump();
+        // map.dump();
         if (map.isConstant()) {
             return map.getConstantResults()[0];
         }
         return -1;
     }
 
-    AffineApplyOp get_new_address(Value idx, PatternRewriter &rewriter, int factor) {
-        auto expr = getAffineDimExpr(0, rewriter.getContext()).ceilDiv(factor);
-        auto map = AffineMap::get(1, 0, expr);
+    Operation *get_new_address(Operation *op, Value idx, PatternRewriter &rewriter, int factor, bool cyclic) {
+        auto expr = cyclic ? getAffineDimExpr(0, rewriter.getContext()).floorDiv(factor) :
+            getAffineDimExpr(0, rewriter.getContext()) % factor;
+        auto new_map = AffineMap::get(arg_num.size(), 0, get_bank_expr(idx, rewriter));
+        auto map = AffineMap::get(arg_num.size(), 0, expr.compose(new_map));
+        if (arg_num.empty()) {
+            assert(map.isConstant());
+            rewriter.setInsertionPoint(op);
+            return rewriter.create<arith::ConstantIndexOp>(op->getLoc(), map.getConstantResults()[0]);
+        }
         SmallVector<Value> apply;
-        apply.push_back(idx);
-        return rewriter.create<AffineApplyOp>(idx.getLoc(), map, apply);
+        for (unsigned i = 0; i < arg_num.size(); ++i) {
+            apply.push_back(Value());
+        }
+        for (auto pair : arg_num) {
+            apply[pair.second] = Value(pair.first);
+        }
+        rewriter.setInsertionPoint(op);
+        return rewriter.create<AffineApplyOp>(op->getLoc(), map, apply);
     }
 
     struct DesignOpPattern : OpRewritePattern<FuncOp> {
-        DesignOpPattern(MLIRContext *ctx, int factor)
-                : OpRewritePattern<FuncOp>(ctx), factor(factor) {}
+        DesignOpPattern(MLIRContext *ctx, int factor, bool cyclic)
+                : OpRewritePattern<FuncOp>(ctx), factor(factor), cyclic(cyclic) {}
 
         LogicalResult matchAndRewrite(FuncOp op,
                                       PatternRewriter &rewriter) const override {
@@ -136,12 +156,14 @@ namespace {
                         for (auto &use : arg.getUses()) {
                             auto sop = use.getOwner();
                             if (auto load = dyn_cast<memref::LoadOp>(sop)) {
-                                if (get_bank(load.getIndices()[rank], rewriter, factor) == -1) {
+                                unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                                if (get_bank(load.getIndices()[rank], rewriter, new_factor, cyclic) == -1) {
                                     flag = false;
                                     break;
                                 }
                             } else if (auto store = dyn_cast<memref::StoreOp>(sop)) {
-                                if (get_bank(store.getIndices()[rank], rewriter, factor) == -1) {
+                                unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                                if (get_bank(store.getIndices()[rank], rewriter, new_factor, cyclic) == -1) {
                                     flag = false;
                                     break;
                                 }
@@ -182,53 +204,66 @@ namespace {
                         for (auto &use : arg.getUses()) {
                             auto sop = use.getOwner();
                             if (auto load = dyn_cast<memref::LoadOp>(sop)) {
+                                SmallVector<Value> idx = load.getIndices();
                                 unsigned bank = 0;
                                 for (unsigned rank = 0; rank < memref.getRank(); ++rank) {
                                     if (partition[rank]) {
-                                        bank = bank * factor + get_bank(load.getIndices()[rank], rewriter, factor);
-                                        rewriter.setInsertionPoint(load);
-                                        auto new_address = get_new_address(load.getIndices()[rank], rewriter, factor);
-                                        load.getIndicesMutable()[rank] = new_address.getResult();
+                                        unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                                        bank = bank * factor + get_bank(idx[rank], rewriter, new_factor, cyclic);
+                                        auto new_address = get_new_address(load, idx[rank], rewriter, new_factor, cyclic);
+                                        idx[rank] = new_address->getResult(0);
                                     }
+                                }
+                                for (unsigned i = 0; i < idx.size(); ++i) {
+                                    load->setOperand(i+1, idx[i]);
                                 }
                                 new_part.push_back(PARTITION {load, bank});
                             } else if (auto store = dyn_cast<memref::StoreOp>(sop)) {
+                                SmallVector<Value> idx = store.getIndices();
                                 unsigned bank = 0;
                                 for (unsigned rank = 0; rank < memref.getRank(); ++rank) {
                                     if (partition[rank]) {
-                                        bank = bank * factor + get_bank(store.getIndices()[rank], rewriter, factor);
-                                        rewriter.setInsertionPoint(store);
-                                        auto new_address = get_new_address(store.getIndices()[rank], rewriter, factor);
-                                        store.getIndicesMutable()[rank] = new_address.getResult();
+                                        unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                                        bank = bank * factor + get_bank(idx[rank], rewriter, new_factor, cyclic);
+                                        auto new_address = get_new_address(store, idx[rank], rewriter, new_factor, cyclic);
+                                        idx[rank] = new_address->getResult(0);
                                     }
+                                }
+                                for (unsigned i = 0; i < idx.size(); ++i) {
+                                    store->setOperand(i+2, idx[i]);
                                 }
                                 new_part.push_back(PARTITION {store, bank});
                             }
                         }
                         for (auto part : new_part) {
-                            part.op->setOperand(0, new_array[part.bank]);
+                            part.op->setOperand(isa<memref::StoreOp>(part.op), new_array[part.bank]);
                         }
                     }
                 }
             }
+            // op.dump();
             unsigned erased = 0;
             for (auto erase : erase_arg) {
+                // std::cerr<<"Erase: "<<erase<<std::endl;
                 op.eraseArgument(erase - erased);
                 erased += 1;
+                // std::cerr<<"ERASED"<<std::endl;
             }
             return success();
         }
 
         int factor;
+        bool cyclic;
     };
 
     struct ArrayPartitionPass : ArrayPartitionBase<ArrayPartitionPass> {
         void runOnOperation() override {
             auto funcOp = getOperation();
             RewritePatternSet Patterns(&getContext());
-            Patterns.add<DesignOpPattern>(funcOp.getContext(), factor);
+            Patterns.add<DesignOpPattern>(funcOp.getContext(), factor, cyclic);
             if (failed(applyOpPatternsAndFold(funcOp, std::move(Patterns))))
                 signalPassFailure();
+            funcOp->removeAttr("array-partition");
         }
     };
 

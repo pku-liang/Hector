@@ -28,6 +28,11 @@ namespace {
     using namespace mlir;
     using namespace mlir::arith;
 
+    std::string get_opertion_attr() {
+        static int attr_num = 0;
+        return "control_" + std::to_string(attr_num++);
+    }
+
     template<typename SourceOp, typename TargetOp>
     void myReplaceOp(SourceOp op, TargetOp newOp, ConversionPatternRewriter &rewriter) {
         // for (auto [newValue, oldValue] : llvm::zip(op.getResults(), newOp.getResults())) {
@@ -191,6 +196,7 @@ namespace {
 
             rewriter.setInsertionPoint(op);
             auto upperBound = rewriter.create<SubIOp>(op.getLoc(), operands[1], operands[2]);
+            upperBound->setAttr("dump", StringAttr::get(rewriter.getContext(), get_opertion_attr().c_str()));
 
             auto newOp = rewriter.create<tor::ForOp>(
                     op.getLoc(), operands[0], upperBound.getResult(), operands[2],
@@ -267,6 +273,7 @@ namespace {
             }
 
             rewriter.setInsertionPoint(op);
+            std::cerr<<"1"<<std::endl;
 
             TargetOp newOp;
 
@@ -275,10 +282,13 @@ namespace {
             else
                 newOp = rewriter.create<TargetOp>(op.getLoc(), op.getResult().getType(),
                                                   operands[0], operands[1], 0, 0);
+            std::cerr<<"2"<<std::endl;
+            op->dump();
             newOp->setAttr("dump", op->getAttr("dump"));
 
             // rewriter.replaceOp(op, newOp.getResult());
             myReplaceOp(op, newOp, rewriter);
+            std::cerr<<"3"<<std::endl;
             // newOp->getParentOp()->dump();
 
             return success();

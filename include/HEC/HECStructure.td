@@ -110,7 +110,7 @@ def ComponentOp : HECOp<"component", [
 }
 
 def InstanceOp : HECOp<"instance", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     HasParent<"ComponentOp">
   ]> {
   let summary = "HEC Instance";

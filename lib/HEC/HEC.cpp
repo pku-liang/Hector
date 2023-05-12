@@ -319,16 +319,16 @@ ComponentOp InstanceOp::getReferencedComponent() {
 }
 
 // Provide meaningful names to the result values of a CellOp.
-// void InstanceOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-//     auto component = getReferencedComponent();
-//     auto portNames = component.portNames();
+void InstanceOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+    auto component = getReferencedComponent();
+    auto portNames = component.getPortNames();
 
-//     std::string prefix = instanceName().str() + ".";
-//     for (size_t i = 0, e = portNames.size(); i != e; ++i) {
-//         StringRef portName = portNames[i].cast<StringAttr>().getValue();
-//         setNameFn(getResult(i), prefix + portName.str());
-//     }
-// }
+    std::string prefix = getInstanceName().str() + ".";
+    for (size_t i = 0, e = portNames.size(); i != e; ++i) {
+        StringRef portName = portNames[i].cast<StringAttr>().getValue();
+        setNameFn(getResult(i), prefix + portName.str());
+    }
+}
 
 LogicalResult InstanceOp::verify() {
     if (this->getComponentName() == "main")

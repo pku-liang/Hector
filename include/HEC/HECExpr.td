@@ -14,6 +14,7 @@ def NotOp : HECOp<"not",[Pure]> {
   let assemblyFormat = [{
     $src (` ` `if` $guard^)? attr-dict `:` type($src)
   }];
+  let hasFolder = 1;
 }
 
 def AddIOp : HECOp<"addi", [Pure]> {
@@ -72,6 +73,8 @@ def CmpIOp : HECOp<"cmpi", [Pure]> {
     I1 : $res
   );
   
+  let hasFolder = 1;
+
   let assemblyFormat= [{
     $pred $lhs $rhs (` ` `if` $guard^)? attr-dict `:` 
     `(` type($lhs) `,` type($rhs) `)` `->` type($res)

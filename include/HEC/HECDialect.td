@@ -17,6 +17,7 @@ def HECDialect : Dialect {
     // Register all hec types.
     //void registerTypes();
   }];
+  let hasConstantMaterializer = 1;
 }
 
 class HECOp<string mnemonic, list<Trait> traits = []> :

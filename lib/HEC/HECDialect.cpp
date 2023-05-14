@@ -1,5 +1,6 @@
 #include "HEC/HECDialect.h"
 #include "HEC/HEC.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 // #include "HEC/HECTypes.h"
 
 #include "mlir/IR/Builders.h"
@@ -17,6 +18,13 @@ void HECDialect::initialize() {
   #define GET_OP_LIST
   #include "HEC/HEC.cpp.inc"
         >();
+}
+
+mlir::Operation *HECDialect::materializeConstant(mlir::OpBuilder &builder,
+                                                 mlir::Attribute value,
+                                                 mlir::Type type,
+                                                 mlir::Location loc) {
+  return builder.create<arith::ConstantOp>(loc, type, value);
 }
 
 

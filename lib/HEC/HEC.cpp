@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 
 
 using namespace mlir;
@@ -854,6 +855,44 @@ void StageOp::build(OpBuilder &builder, OperationState &result,
     Block *block = new Block();
     regionBody->push_back(block);
 }
+#define APPLY(PRED) if (pred == #PRED) return lhs.PRED(rhs)
+bool applyCmpPredicate(llvm::StringRef pred, const APInt &lhs, const APInt &rhs) {
+    APPLY(eq);
+    APPLY(ne);
+    APPLY(slt);
+    APPLY(sle);
+    APPLY(sgt);
+    APPLY(sge);
+    APPLY(ult);
+    APPLY(ule);
+    APPLY(ugt);
+    APPLY(uge);
+    llvm_unreachable("unknown cmpi predicate");
+}
+#undef APPLY
+
+OpFoldResult CmpIOp::fold(ArrayRef<Attribute> operands) {
+    operands[0].dump();
+    operands[1].dump();
+    auto lhs = operands[0].dyn_cast_or_null<IntegerAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<IntegerAttr>();
+    if (!lhs || !rhs)
+        return {};
+
+    auto val = applyCmpPredicate(getPred(), lhs.getValue(), rhs.getValue());
+    std::cerr<<"SUCCESS"<<std::endl;
+    return BoolAttr::get(getContext(), val);
+}
+
+OpFoldResult NotOp::fold(ArrayRef<Attribute> operands) {
+    auto lhs = operands[0].dyn_cast_or_null<BoolAttr>();
+    if (!lhs)
+        return {};
+
+    return BoolAttr::get(getContext(), !(lhs.getValue()));
+}
+
+
 
 #define GET_OP_CLASSES
 

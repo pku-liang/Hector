@@ -194,6 +194,7 @@ def AssignOp : HECOp<"assign", [
   let assemblyFormat = [{
     $dest `=`  $src (`if` $guard^)?  attr-dict `:` type($src) `->` type($dest)
   }];
+  let hasCanonicalizeMethod = 1;
 }
 
 def WireOp : HECOp<"wire",[]> {

@@ -1773,6 +1773,7 @@ namespace mlir {
                 } else if (node.type == TimeNode::NodeT::IF) {
                     // IFGen
                     auto state0 = createState(std::to_string(id));
+                    state0->setAttr("control", IntegerAttr::get(IntegerType::get(rewriter.getContext(), 32), 1));
                     node2State[t] = id;
 
                     assert(node.edges.size() >= 1 && node.edges.size() <= 2 &&
@@ -1926,7 +1927,9 @@ namespace mlir {
                     set_state_if(t, state0.getName().str());
                 } else if (node.type == TimeNode::NodeT::WHILE) {
                     auto state0 = createState(std::to_string(id));
+                    state0->setAttr("control", IntegerAttr::get(IntegerType::get(rewriter.getContext(), 32), 1));
                     auto state1 = createStateAfter(std::to_string(id) + "_entry", state0);
+                    state1->setAttr("control", IntegerAttr::get(IntegerType::get(rewriter.getContext(), 32), 1));
                     node2State[t] = id;
                     auto whileop = llvm::dyn_cast<tor::WhileOp>(node.op);
 
@@ -2012,7 +2015,9 @@ namespace mlir {
                     set_state_while(t, state0.getName().str(), whileop);
                 } else if (node.type == TimeNode::NodeT::FOR) {
                     auto state0 = createState(std::to_string(id));
+                    state0->setAttr("control", IntegerAttr::get(IntegerType::get(rewriter.getContext(), 32), 1));
                     auto state1 = createStateAfter(std::to_string(id) + "_entry", state0);
+                    state1->setAttr("control", IntegerAttr::get(IntegerType::get(rewriter.getContext(), 32), 1));
                     node2State[t] = id;
                     auto forop = llvm::dyn_cast<tor::ForOp>(node.op);
 

@@ -767,6 +767,7 @@ void StateOp::print(OpAsmPrinter &p) {
     p.printRegion(this->getBody(), /*printEntryBlockArgs=*/false,
             /*printBlockTerminators=*/true,
             /*printEmptyBlock=*/false);
+    p.printOptionalAttrDict((*this)->getAttrs(), {"initial", "sym_name"});
 }
 
 ParseResult StateOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -793,6 +794,9 @@ ParseResult StateOp::parse(OpAsmParser &parser, OperationState &result) {
 
     if (body->empty())
         body->push_back(new Block());
+    
+    if (parser.parseOptionalAttrDict(result.attributes))
+        return failure();
     return success();
 }
 
@@ -906,6 +910,22 @@ LogicalResult GotoOp::canonicalize(GotoOp op, PatternRewriter &rewriter) {
     return failure();
 }
 
+LogicalResult AssignOp::canonicalize(AssignOp op, PatternRewriter &rewriter) {
+    auto guard = op.getGuard();
+    if (guard) {
+        if (auto constant = dyn_cast<arith::ConstantIntOp>(guard.getDefiningOp())) {
+            if (!constant.value()) {
+                rewriter.eraseOp(op);
+                return success();
+            } else {
+                op.getGuardMutable().assign(Value());
+                return success();
+            }
+        }
+    }
+    return failure();
+}
+
 LogicalResult PrimitiveOp::canonicalize(PrimitiveOp op, PatternRewriter &rewriter) {
     if (op.getPrimitiveName() != "register")
         return failure();
@@ -934,6 +954,58 @@ LogicalResult PrimitiveOp::canonicalize(PrimitiveOp op, PatternRewriter &rewrite
         return success();
     }
     return failure();
+}
+
+LogicalResult StateSetOp::canonicalize(StateSetOp op, PatternRewriter &rewriter) {
+    bool change = false;
+    for (auto &sop : op.getBody().front()) {
+        auto state = cast<StateOp>(sop);
+        auto name = state.getName();
+        if (state->hasAttr("control")) {
+            unsigned goto_num = 0;
+            std::string succ;
+            for (auto &body_op : state.getBody().front()) {
+                if (auto trans = dyn_cast<TransitionOp>(body_op)) {
+                    for (auto &sub_op : trans.getBody().front()) {
+                        if (auto goto_op = dyn_cast<GotoOp>(sub_op)) {
+                            goto_num += 1;
+                            succ = goto_op.getDest();
+                        }
+                    }
+                }
+            }
+            if (goto_num > 1) continue;
+            for (auto &pred : op.getBody().front()) {
+                auto pred_state = cast<StateOp>(pred);
+                for (auto &body_op : pred_state.getBody().front()) {
+                    if (auto trans = dyn_cast<TransitionOp>(body_op)) {
+                        unsigned goto_num = 0;
+                        for (auto &sub_op : trans.getBody().front()) {
+                            if (auto goto_op = dyn_cast<GotoOp>(sub_op)) {
+                                goto_num += 1;
+                            }
+                        }
+                        if (goto_num > 1) continue;
+                        for (auto &sub_op : trans.getBody().front()) {
+                            if (auto goto_op = dyn_cast<GotoOp>(sub_op)) {
+                                if (goto_op.getCond()) continue;
+                                if (goto_op.getDest() == name) {
+                                    rewriter.setInsertionPoint(trans);
+                                    for (auto &body_op : state.getBody().front()) {
+                                        if (!isa<TransitionOp>(body_op)) {
+                                            rewriter.clone(body_op);
+                                        }
+                                    }
+                                    goto_op.setDest(succ);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return change ? success() : failure();
 }
 
 #define GET_OP_CLASSES

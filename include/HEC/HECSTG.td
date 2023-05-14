@@ -24,6 +24,7 @@ def StateSetOp : HECOp<"stateset", [
 
   }];
   let assemblyFormat = "$body attr-dict";
+  let hasCanonicalizeMethod = 1;
   //let verfier = "return ::verify$cppClass(*this);";
 }
 

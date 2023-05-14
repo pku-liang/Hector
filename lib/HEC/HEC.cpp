@@ -762,6 +762,7 @@ void StateOp::print(OpAsmPrinter &p) {
 
     if (this->getInitial())
         p << "*";
+    p << " ";
 
     p.printRegion(this->getBody(), /*printEntryBlockArgs=*/false,
             /*printBlockTerminators=*/true,
@@ -872,15 +873,12 @@ bool applyCmpPredicate(llvm::StringRef pred, const APInt &lhs, const APInt &rhs)
 #undef APPLY
 
 OpFoldResult CmpIOp::fold(ArrayRef<Attribute> operands) {
-    operands[0].dump();
-    operands[1].dump();
     auto lhs = operands[0].dyn_cast_or_null<IntegerAttr>();
     auto rhs = operands[1].dyn_cast_or_null<IntegerAttr>();
     if (!lhs || !rhs)
         return {};
 
     auto val = applyCmpPredicate(getPred(), lhs.getValue(), rhs.getValue());
-    std::cerr<<"SUCCESS"<<std::endl;
     return BoolAttr::get(getContext(), val);
 }
 
@@ -892,7 +890,51 @@ OpFoldResult NotOp::fold(ArrayRef<Attribute> operands) {
     return BoolAttr::get(getContext(), !(lhs.getValue()));
 }
 
+LogicalResult GotoOp::canonicalize(GotoOp op, PatternRewriter &rewriter) {
+    auto guard = op.getCond();
+    if (guard) {
+        if (auto constant = dyn_cast<arith::ConstantIntOp>(guard.getDefiningOp())) {
+            if (!constant.value()) {
+                rewriter.eraseOp(op);
+                return success();
+            } else {
+                op.getCondMutable().assign(Value());
+                return success();
+            }
+        }
+    }
+    return failure();
+}
 
+LogicalResult PrimitiveOp::canonicalize(PrimitiveOp op, PatternRewriter &rewriter) {
+    if (op.getPrimitiveName() != "register")
+        return failure();
+    auto reg = op.getResult(0);
+    bool used = false;
+    for (auto &use : reg.getUses()) {
+        if (isa<InitOp>(use.getOwner())) {
+            used = true;
+            break;
+        } else if (isa<AssignOp>(use.getOwner())) {
+            if (use.getOperandNumber() == 1) {
+                used = true;
+                break;
+            }
+        } else {
+            used = true;
+            break;
+        }
+    }
+    
+    if (!used) {
+        for (auto &use : reg.getUses()) {
+            rewriter.eraseOp(use.getOwner());
+        }
+        rewriter.eraseOp(op);
+        return success();
+    }
+    return failure();
+}
 
 #define GET_OP_CLASSES
 

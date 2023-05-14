@@ -167,6 +167,8 @@ def PrimitiveOp : HECOp<"primitive", [
   let assemblyFormat = [{
     $instanceName ` ` `is` $primitiveName attr-dict (`:` type($results)^)? 
   }];
+
+  let hasCanonicalizeMethod = 1;
   //let verifier = "return ::verify$cppClass(*this);";
 }
 

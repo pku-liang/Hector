@@ -91,6 +91,7 @@ def GotoOp : HECOp<"goto", [
     $dest (` ` `if` $cond^)? attr-dict
   }];
 
+  let hasCanonicalizeMethod = 1;
   //let verfier = "return ::verify$cppClass(*this);";
 }
 

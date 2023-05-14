@@ -63,9 +63,9 @@ namespace {
                     bool W = false;
                     std::string RW;
                     for (auto &use : arg.getUses()) {
-                        if (isa<memref::LoadOp, tor::LoadOp>(use.getOwner())) {
+                        if (isa<memref::LoadOp>(use.getOwner())) {
                             R = true;
-                        } else if (isa<memref::StoreOp, tor::StoreOp>(use.getOwner())) {
+                        } else if (isa<memref::StoreOp>(use.getOwner())) {
                             W = true;
                         } else {
                             assert(false);
@@ -73,7 +73,65 @@ namespace {
                     }
                     if (R) RW += "r";
                     if (W) RW += "w";
-                    auto newType = tor::MemRefType::get(memref.getShape(), memref.getElementType(), {}, StringAttr::get(getContext(), RW));
+                    auto shape = memref.getShape();
+                    int64_t size = 1;
+                    SmallVector<int64_t> one;
+                    for (auto s : shape) {
+                        size *= s;
+                    }
+                    one.push_back(size);
+                    for (auto &use : arg.getUses()) {
+                        if (auto load = dyn_cast<memref::LoadOp>(use.getOwner())) {
+                            auto lastInsertion = rewriter.saveInsertionPoint();
+                            rewriter.setInsertionPoint(load);
+                            auto last_idx = load.getIndices()[0];
+                            for (unsigned i = 1; i < shape.size(); ++i) {
+                                int length = shape[i];
+                                if (!(length & (length-1))) {
+                                    int width = log2(length);
+                                    auto size = rewriter.create<ConstantIndexOp>(load.getLoc(), width);
+                                    auto mul = rewriter.create<ShLIOp>(load.getLoc(), last_idx, size.getResult());
+                                    auto add = rewriter.create<OrIOp>(load.getLoc(), load.getIndices()[i], mul.getResult());
+                                    last_idx = add.getResult();
+                                } else {
+                                    auto size = rewriter.create<ConstantIndexOp>(load.getLoc(), length);
+                                    auto mul = rewriter.create<MulIOp>(load.getLoc(), last_idx, size.getResult());
+                                    auto add = rewriter.create<AddIOp>(load.getLoc(), load.getIndices()[i], mul.getResult());
+                                    last_idx = add.getResult();
+                                }
+                            }
+                            load->setOperand(1, last_idx);
+                            for (unsigned i = 1; i < shape.size(); ++i) {
+                                load->eraseOperand(i+1);
+                            }
+                            rewriter.restoreInsertionPoint(lastInsertion);
+                        } else if (auto store = dyn_cast<memref::StoreOp>(use.getOwner())) {
+                            auto lastInsertion = rewriter.saveInsertionPoint();
+                            rewriter.setInsertionPoint(store);
+                            auto last_idx = store.getIndices()[0];
+                            for (unsigned i = 1; i < shape.size(); ++i) {
+                                int length = shape[i];
+                                if (!(length & (length-1))) {
+                                    int width = log2(length);
+                                    auto size = rewriter.create<ConstantIndexOp>(store.getLoc(), width);
+                                    auto mul = rewriter.create<ShLIOp>(store.getLoc(), last_idx, size.getResult());
+                                    auto add = rewriter.create<OrIOp>(store.getLoc(), store.getIndices()[i], mul.getResult());
+                                    last_idx = add.getResult();
+                                } else {
+                                    auto size = rewriter.create<ConstantIndexOp>(store.getLoc(), length);
+                                    auto mul = rewriter.create<MulIOp>(store.getLoc(), last_idx, size.getResult());
+                                    auto add = rewriter.create<AddIOp>(store.getLoc(), store.getIndices()[i], mul.getResult());
+                                    last_idx = add.getResult();
+                                }
+                            }
+                            store->setOperand(2, last_idx);
+                            for (unsigned i = 1; i < shape.size(); ++i) {
+                                store->eraseOperand(i+2);
+                            }
+                            rewriter.restoreInsertionPoint(lastInsertion);
+                        }
+                    }
+                    auto newType = tor::MemRefType::get(one, memref.getElementType(), {}, StringAttr::get(getContext(), RW));
                     auto alloc = rewriter.create<tor::AllocOp>(op.getLoc(), newType);
                     arg.replaceAllUsesWith(alloc.getResult());
                     funcOp.eraseArgument(idx);

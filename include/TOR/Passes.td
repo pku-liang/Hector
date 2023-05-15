@@ -51,7 +51,9 @@ def ArrayPartition : Pass<"array-partition", "mlir::func::FuncOp"> {
   let dependentDialects = ["mlir::func::FuncDialect"];
   let options = [
     Option<"factor", "factor", "int", "4", "Partition factor">,
-    Option<"cyclic", "cyclic", "bool", "true", "Cyclic or block">
+    Option<"cyclic", "cyclic", "bool", "true", "Cyclic or block">,
+    Option<"arg_num", "arg_num", "int", "0", "Parition argument number">,
+    Option<"dimension", "dimension", "int", "0", "Partition dimension">
   ];
 }
 

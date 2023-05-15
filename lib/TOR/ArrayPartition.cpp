@@ -101,6 +101,7 @@ namespace {
     }
 
     Operation *get_new_address(Operation *op, Value idx, PatternRewriter &rewriter, int factor, bool cyclic) {
+        arg_num.clear();
         auto expr = cyclic ? getAffineDimExpr(0, rewriter.getContext()).floorDiv(factor) :
             getAffineDimExpr(0, rewriter.getContext()) % factor;
         auto new_map = AffineMap::get(arg_num.size(), 0, get_bank_expr(idx, rewriter));
@@ -122,8 +123,8 @@ namespace {
     }
 
     struct DesignOpPattern : OpRewritePattern<FuncOp> {
-        DesignOpPattern(MLIRContext *ctx, int factor, bool cyclic)
-                : OpRewritePattern<FuncOp>(ctx), factor(factor), cyclic(cyclic) {}
+        DesignOpPattern(MLIRContext *ctx, int factor, bool cyclic, int arg_num, int dimension)
+                : OpRewritePattern<FuncOp>(ctx), factor(factor), cyclic(cyclic), arg_num(arg_num), dimension(dimension) {}
 
         LogicalResult matchAndRewrite(FuncOp op,
                                       PatternRewriter &rewriter) const override {
@@ -145,122 +146,119 @@ namespace {
                     }
                 }
             }
-            unsigned old_args = op.getNumArguments();
-            SmallVector<unsigned> erase_arg;
-            for (unsigned arg_num = 0; arg_num < old_args; ++arg_num) {
-                auto arg = op.getArgument(arg_num);
-                if (auto memref = dyn_cast<MemRefType>(arg.getType())) {
-                    SmallVector<bool> partition;
-                    for (unsigned rank = 0; rank < memref.getRank(); ++rank) {
-                        bool flag = true;
-                        for (auto &use : arg.getUses()) {
-                            auto sop = use.getOwner();
-                            if (auto load = dyn_cast<memref::LoadOp>(sop)) {
-                                unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
-                                if (get_bank(load.getIndices()[rank], rewriter, new_factor, cyclic) == -1) {
-                                    flag = false;
-                                    break;
-                                }
-                            } else if (auto store = dyn_cast<memref::StoreOp>(sop)) {
-                                unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
-                                if (get_bank(store.getIndices()[rank], rewriter, new_factor, cyclic) == -1) {
-                                    flag = false;
-                                    break;
-                                }
-                            } else {
-                                sop->dump();
-                                assert(false && "Unknown memory operation");
+            auto arg = op.getArgument(arg_num);
+            auto memref = cast<MemRefType>(arg.getType());
+            SmallVector<bool> partition;
+            for (int rank = 0; rank < memref.getRank(); ++rank) {
+                bool flag = true;
+                if (rank == dimension) {
+                    for (auto &use : arg.getUses()) {
+                        auto sop = use.getOwner();
+                        if (auto load = dyn_cast<memref::LoadOp>(sop)) {
+                            unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                            if (get_bank(load.getIndices()[rank], rewriter, new_factor, cyclic) == -1) {
+                                flag = false;
+                                break;
                             }
-                        }
-                        partition.push_back(flag);
-                    }
-                    bool flag = false;
-                    for (auto p : partition) {
-                        if (p) {
-                            flag = true;
-                            break;
-                        }
-                    }
-                    if (flag) {
-                        erase_arg.push_back(arg_num);
-                        SmallVector<Value> new_array;
-                        SmallVector<int64_t> new_shape;
-                        unsigned size = 1;
-                        for (auto pair : llvm::zip(partition, memref.getShape())) {
-                            if (std::get<0>(pair)) {
-                                new_shape.push_back(std::get<1>(pair)/factor);
-                                size *= factor;
-                            } else {
-                                new_shape.push_back(std::get<1>(pair));
+                        } else if (auto store = dyn_cast<memref::StoreOp>(sop)) {
+                            unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                            if (get_bank(store.getIndices()[rank], rewriter, new_factor, cyclic) == -1) {
+                                flag = false;
+                                break;
                             }
+                        } else {
+                            sop->dump();
+                            assert(false && "Unknown memory operation");
                         }
-                        auto new_memref = MemRefType::get(new_shape, memref.getElementType());
-                        for (unsigned idx = 0; idx < size; ++idx) {
-                            op.insertArgument(op.getNumArguments(), new_memref, {}, op.getLoc());
-                            new_array.push_back(op.getArgument(op.getNumArguments()-1));
-                        }
-                        struct PARTITION {Operation *op; unsigned bank;};
-                        SmallVector<PARTITION> new_part;
-                        for (auto &use : arg.getUses()) {
-                            auto sop = use.getOwner();
-                            if (auto load = dyn_cast<memref::LoadOp>(sop)) {
-                                SmallVector<Value> idx = load.getIndices();
-                                unsigned bank = 0;
-                                for (unsigned rank = 0; rank < memref.getRank(); ++rank) {
-                                    if (partition[rank]) {
-                                        unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
-                                        bank = bank * factor + get_bank(idx[rank], rewriter, new_factor, cyclic);
-                                        auto new_address = get_new_address(load, idx[rank], rewriter, new_factor, cyclic);
-                                        idx[rank] = new_address->getResult(0);
-                                    }
-                                }
-                                for (unsigned i = 0; i < idx.size(); ++i) {
-                                    load->setOperand(i+1, idx[i]);
-                                }
-                                new_part.push_back(PARTITION {load, bank});
-                            } else if (auto store = dyn_cast<memref::StoreOp>(sop)) {
-                                SmallVector<Value> idx = store.getIndices();
-                                unsigned bank = 0;
-                                for (unsigned rank = 0; rank < memref.getRank(); ++rank) {
-                                    if (partition[rank]) {
-                                        unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
-                                        bank = bank * factor + get_bank(idx[rank], rewriter, new_factor, cyclic);
-                                        auto new_address = get_new_address(store, idx[rank], rewriter, new_factor, cyclic);
-                                        idx[rank] = new_address->getResult(0);
-                                    }
-                                }
-                                for (unsigned i = 0; i < idx.size(); ++i) {
-                                    store->setOperand(i+2, idx[i]);
-                                }
-                                new_part.push_back(PARTITION {store, bank});
-                            }
-                        }
-                        for (auto part : new_part) {
-                            part.op->setOperand(isa<memref::StoreOp>(part.op), new_array[part.bank]);
-                        }
-                    }
+                    }                    
+                } else {
+                    flag = false;
+                }
+                partition.push_back(flag);
+            }
+            bool flag = false;
+            for (auto p : partition) {
+                if (p) {
+                    flag = true;
+                    break;
                 }
             }
-            // op.dump();
-            unsigned erased = 0;
-            for (auto erase : erase_arg) {
-                // std::cerr<<"Erase: "<<erase<<std::endl;
-                op.eraseArgument(erase - erased);
-                erased += 1;
-                // std::cerr<<"ERASED"<<std::endl;
+            if (flag) {
+                // arg.dump();
+                // for (auto p : partition) {
+                //     std::cerr<<p<<" ";
+                // }
+                // std::cerr<<std::endl;
+                SmallVector<Value> new_array;
+                SmallVector<int64_t> new_shape;
+                unsigned size = 1;
+                for (auto pair : llvm::zip(partition, memref.getShape())) {
+                    if (std::get<0>(pair)) {
+                        new_shape.push_back(std::get<1>(pair)/factor);
+                        size *= factor;
+                    } else {
+                        new_shape.push_back(std::get<1>(pair));
+                    }
+                }
+                auto new_memref = MemRefType::get(new_shape, memref.getElementType());
+                for (unsigned idx = 0; idx < size; ++idx) {
+                    op.insertArgument(op.getNumArguments(), new_memref, {}, op.getLoc());
+                    new_array.push_back(op.getArgument(op.getNumArguments()-1));
+                }
+                struct PARTITION {Operation *op; unsigned bank;};
+                SmallVector<PARTITION> new_part;
+                for (auto &use : arg.getUses()) {
+                    auto sop = use.getOwner();
+                    if (auto load = dyn_cast<memref::LoadOp>(sop)) {
+                        SmallVector<Value> idx = load.getIndices();
+                        unsigned bank = 0;
+                        for (unsigned rank = 0; rank < memref.getRank(); ++rank) {
+                            if (partition[rank]) {
+                                unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                                bank = bank * factor + get_bank(idx[rank], rewriter, new_factor, cyclic);
+                                auto new_address = get_new_address(load, idx[rank], rewriter, new_factor, cyclic);
+                                idx[rank] = new_address->getResult(0);
+                            }
+                        }
+                        for (unsigned i = 0; i < idx.size(); ++i) {
+                            load->setOperand(i+1, idx[i]);
+                        }
+                        new_part.push_back(PARTITION {load, bank});
+                    } else if (auto store = dyn_cast<memref::StoreOp>(sop)) {
+                        SmallVector<Value> idx = store.getIndices();
+                        unsigned bank = 0;
+                        for (unsigned rank = 0; rank < memref.getRank(); ++rank) {
+                            if (partition[rank]) {
+                                unsigned new_factor = cyclic ? factor : memref.getShape()[rank] / factor;
+                                bank = bank * factor + get_bank(idx[rank], rewriter, new_factor, cyclic);
+                                auto new_address = get_new_address(store, idx[rank], rewriter, new_factor, cyclic);
+                                idx[rank] = new_address->getResult(0);
+                            }
+                        }
+                        for (unsigned i = 0; i < idx.size(); ++i) {
+                            store->setOperand(i+2, idx[i]);
+                        }
+                        new_part.push_back(PARTITION {store, bank});
+                    }
+                }
+                for (auto part : new_part) {
+                    part.op->setOperand(isa<memref::StoreOp>(part.op), new_array[part.bank]);
+                }
             }
+            op.eraseArgument(arg_num);
             return success();
         }
 
         int factor;
         bool cyclic;
+        int arg_num, dimension;
     };
 
     struct ArrayPartitionPass : ArrayPartitionBase<ArrayPartitionPass> {
         void runOnOperation() override {
             auto funcOp = getOperation();
             RewritePatternSet Patterns(&getContext());
-            Patterns.add<DesignOpPattern>(funcOp.getContext(), factor, cyclic);
+            Patterns.add<DesignOpPattern>(funcOp.getContext(), factor, cyclic, arg_num, dimension);
             if (failed(applyOpPatternsAndFold(funcOp, std::move(Patterns))))
                 signalPassFailure();
             funcOp->removeAttr("array-partition");

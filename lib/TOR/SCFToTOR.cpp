@@ -273,24 +273,19 @@ namespace {
             }
 
             rewriter.setInsertionPoint(op);
-            std::cerr<<"1"<<std::endl;
 
             TargetOp newOp;
-
             if (op.getResult().getType().template isa<IndexType>())
                 newOp = rewriter.create<TargetOp>(op.getLoc(), operands[0], operands[1]);
             else
                 newOp = rewriter.create<TargetOp>(op.getLoc(), op.getResult().getType(),
                                                   operands[0], operands[1], 0, 0);
-            std::cerr<<"2"<<std::endl;
             op->dump();
             newOp->setAttr("dump", op->getAttr("dump"));
 
             // rewriter.replaceOp(op, newOp.getResult());
             myReplaceOp(op, newOp, rewriter);
-            std::cerr<<"3"<<std::endl;
             // newOp->getParentOp()->dump();
-
             return success();
         }
     };
@@ -391,21 +386,22 @@ namespace {
         }
     };
 
-    struct ShiftLeftConversionPattern : public OpConversionPattern<ShLIOp> {
-        using OpConversionPattern<ShLIOp>::OpConversionPattern;
+    template<typename Op>
+    struct BinaryIOpConversion : public OpConversionPattern<Op> {
+        using OpConversionPattern<Op>::OpConversionPattern;
 
         LogicalResult
-        matchAndRewrite(ShLIOp op, ShLIOp::Adaptor adaptor,
+        matchAndRewrite(Op op, typename Op::Adaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
             auto operands = adaptor.getOperands();
             for (auto opr : operands)
-                if (opr.getType().isa<IndexType>())
+                if (opr.getType().template isa<IndexType>())
                     return failure();
-            if (!op.getResult().getType().isa<IndexType>())
+            if (!op.getResult().getType().template isa<IndexType>())
                 return failure();
 
             auto newOp =
-                    rewriter.create<ShLIOp>(op.getLoc(), operands[0], operands[1]);
+                    rewriter.create<Op>(op.getLoc(), operands[0], operands[1]);
             newOp->setAttr("dump", op->getAttr("dump"));
 
             // rewriter.replaceOp(op, newOp.getResult());
@@ -414,6 +410,8 @@ namespace {
             return success();
         }
     };
+    using ShiftLeftConversionPattern = BinaryIOpConversion<ShLIOp>;
+    using OrIConversionPattern = BinaryIOpConversion<OrIOp>;
 
     struct FuncOpPattern : public OpConversionPattern<tor::FuncOp> {
         using OpConversionPattern<tor::FuncOp>::OpConversionPattern;
@@ -537,7 +535,11 @@ namespace {
 
                 target.addLegalDialect<tor::TORDialect>();
                 target.addDynamicallyLegalOp<ShLIOp>([](ShLIOp op) {
-                    // llvm::outs() << "GOOD\n";
+                    if (op.getResult().getType().isa<IndexType>())
+                        return false;
+                    return true;
+                });
+                target.addDynamicallyLegalOp<OrIOp>([](OrIOp op) {
                     if (op.getResult().getType().isa<IndexType>())
                         return false;
                     return true;
@@ -561,7 +563,8 @@ namespace {
                         AddFOpConversion, SubFOpConversion, DivFOpConversion,
                         YieldOpConversion, CondOpConversion, WhileOpConversion,
                         ForOpConversion, IfOpConversion, FuncOpPattern,
-                        CastOpErasure, CmpFOpConversion, ShiftLeftConversionPattern,
+                        CastOpErasure, CmpFOpConversion,
+                        ShiftLeftConversionPattern, OrIConversionPattern,
                         /*MoveConstantUp, */CallOpConversion>(&getContext());
 
                 if (failed(applyPartialConversion(designOp, target, std::move(patterns))))

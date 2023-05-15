@@ -49,7 +49,8 @@ void tor::MulIOp::build(OpBuilder &odsBuilder,
 {
   IntegerType lhsType = lhs.getType().cast<IntegerType>();
   IntegerType rhsType = rhs.getType().cast<IntegerType>();
-  IntegerType resType = IntegerType::get(odsState.getContext(), std::min(64U, lhsType.getWidth() + rhsType.getWidth()));
+  // IntegerType resType = IntegerType::get(odsState.getContext(), std::min(64U, lhsType.getWidth() + rhsType.getWidth()));
+  IntegerType resType = IntegerType::get(odsState.getContext(), std::max(lhsType.getWidth(), rhsType.getWidth()));
 
   odsState.addAttribute("starttime", odsBuilder.getIntegerAttr(odsBuilder.getIntegerType(32), 0));
   odsState.addAttribute("endtime", odsBuilder.getIntegerAttr(odsBuilder.getIntegerType(32), 0));

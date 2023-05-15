@@ -39,19 +39,23 @@ namespace {
             return "comb_" + std::to_string(attr_num++);
         }
 
+        string get_const_attr() {
+            return "const_" + std::to_string(attr_num++);
+        }
+
         string get_dump(Operation *op) {
             op->dump();
             return string(op->getAttr("dump").dyn_cast<StringAttr>().getValue());
         }
 
         string get_attr(Attribute attr) {
-            if (auto int_attr = attr.dyn_cast<IntegerAttr>()) {
+            if (auto bool_attr = attr.dyn_cast<BoolAttr>()) {
+                return std::to_string(bool_attr.getValue());
+            } else if (auto int_attr = attr.dyn_cast<IntegerAttr>()) {
                 return std::to_string(int_attr.getValue().getSExtValue());
             } else if (auto float_attr = attr.dyn_cast<FloatAttr>()) {
                 double float_str = float_attr.getValue().convertToDouble();
                 return std::to_string(float_str);
-            } else if (auto bool_attr = attr.dyn_cast<BoolAttr>()) {
-                return std::to_string(bool_attr.getValue());
             } else if (auto str_attr = attr.dyn_cast<StringAttr>()) {
                 return string(str_attr.getValue());
             } else {
@@ -391,7 +395,12 @@ namespace {
                     if (primitive.getPrimitiveName() == "mem") {
                         json sj;
                         sj["name"] = primitive.getInstanceName();
-                        sj["type"] = get_type(primitive->getResult(2).getType());
+                        auto attr = primitive->getAttrOfType<StringAttr>("ports").getValue();
+                        if (attr == "rw") {
+                            sj["type"] = get_type(primitive->getResult(3).getType());
+                        } else {
+                            sj["type"] = get_type(primitive->getResult(2).getType());
+                        }
                         sj["size"] = get_attr_num(primitive->getAttr("len"));
                         j["memory"].push_back(sj);
                     } else {
@@ -413,6 +422,12 @@ namespace {
                     if (isa<hec::ShiftLeftOp, hec::AddIOp, hec::SubIOp, hec::NotOp, hec::XOrOp, hec::AndOp,
                             hec::OrOp, hec::CmpIOp, hec::TruncateIOp, hec::SelectOp>(op)) {
                         op->setAttr("dump", StringAttr::get(&getContext(), get_comb_attr().c_str()));
+                    }
+                });
+
+                designOp.walk([&](ConstantOp op) {
+                    if (!op->hasAttr("dump")) {
+                        op->setAttr("dump", StringAttr::get(&getContext(), get_const_attr().c_str()));
                     }
                 });
 

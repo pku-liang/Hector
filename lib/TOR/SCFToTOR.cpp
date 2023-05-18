@@ -18,6 +18,7 @@
 #include "TOR/TORDialect.h"
 #include "TOR/PassDetail.h"
 #include "TOR/Passes.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include <set>
 #include <iostream>
@@ -33,13 +34,19 @@ namespace {
         return "control_" + std::to_string(attr_num++);
     }
 
+    std::string get_tmp_attr() {
+        static int attr_num = 0;
+        return "unknown_" + std::to_string(attr_num++);
+    }
+
     template<typename SourceOp, typename TargetOp>
     void myReplaceOp(SourceOp op, TargetOp newOp, ConversionPatternRewriter &rewriter) {
-        // for (auto [newValue, oldValue] : llvm::zip(op.getResults(), newOp.getResults())) {
+        // for (auto [newValue, oldValue] : llvm::zip(op->getResults(), newOp->getResults())) {
         //     newValue.replaceAllUsesWith(oldValue);
         // }
-        op.getResult().replaceAllUsesWith(newOp.getResult());
-        rewriter.eraseOp(op);
+        rewriter.replaceOp(op, newOp->getResults());
+        // op.getResult().replaceAllUsesWith(newOp.getResult());
+        // rewriter.eraseOp(op);
     }
 
     struct ConstIndexConversion : public OpConversionPattern<ConstantOp> {
@@ -53,6 +60,11 @@ namespace {
                 rewriter.setInsertionPoint(op);
                 auto newOp = rewriter.create<ConstantIntOp>(
                         op->getLoc(), value.cast<IntegerAttr>().getInt(), 32);
+                //FIXME: ???
+                if (!op->hasAttr("dump")) {
+                    op->setAttr("dump", StringAttr::get(rewriter.getContext(), get_tmp_attr().c_str()));
+                    // op->dump();
+                }
                 newOp->setAttr("dump", op->getAttr("dump"));
                 // rewriter.replaceOp(op, {newOp.getResult()});
                 myReplaceOp(op, newOp, rewriter);
@@ -256,7 +268,6 @@ namespace {
             return success();
         }
     };
-
     template<typename SourceOp, typename TargetOp>
     struct BinIOpConversion : public OpConversionPattern<SourceOp> {
         using OpConversionPattern<SourceOp>::OpConversionPattern;
@@ -266,7 +277,6 @@ namespace {
                         ConversionPatternRewriter &rewriter) const override {
             auto operands = adaptor.getOperands();
             assert(operands.size() == 2 && "addi has two operand");
-
             for (auto opr : operands) {
                 if (opr.getType().template isa<IndexType>())
                     return failure();
@@ -280,7 +290,7 @@ namespace {
             else
                 newOp = rewriter.create<TargetOp>(op.getLoc(), op.getResult().getType(),
                                                   operands[0], operands[1], 0, 0);
-            op->dump();
+            // op->dump();
             newOp->setAttr("dump", op->getAttr("dump"));
 
             // rewriter.replaceOp(op, newOp.getResult());
@@ -399,10 +409,11 @@ namespace {
                     return failure();
             if (!op.getResult().getType().template isa<IndexType>())
                 return failure();
-
+            
             auto newOp =
                     rewriter.create<Op>(op.getLoc(), operands[0], operands[1]);
             newOp->setAttr("dump", op->getAttr("dump"));
+
 
             // rewriter.replaceOp(op, newOp.getResult());
             myReplaceOp(op, newOp, rewriter);
@@ -515,6 +526,26 @@ namespace {
         }
     };
 
+    class IndexTypeConverter : public TypeConverter {
+    public:
+    IndexTypeConverter() {
+        addConversion([](Type type) { return type; });
+        addConversion(convertIndexType);
+        auto addUnrealizedCast = [](OpBuilder &builder, Type type, ValueRange inputs, Location loc) {
+            auto cast = builder.create<UnrealizedConversionCastOp>(loc, type, inputs);
+            return Optional<Value>(cast.getResult(0));
+        };
+        addSourceMaterialization(addUnrealizedCast);
+        addTargetMaterialization(addUnrealizedCast);
+    }
+    static Optional<Type> convertIndexType(Type type) {
+        if(type.isa<IndexType>()) {
+            return IntegerType::get(type.getContext(), 32);
+        }
+        return llvm::None;
+    }
+    };
+
     struct ConvertInputPass : SCFToTORBase<ConvertInputPass> {
         void runOnOperation() override {
             auto designOp = getOperation();
@@ -532,6 +563,8 @@ namespace {
             {
                 ConversionTarget target(getContext());
                 RewritePatternSet patterns(&getContext());
+                IndexTypeConverter converter;
+                
 
                 target.addLegalDialect<tor::TORDialect>();
                 target.addDynamicallyLegalOp<ShLIOp>([](ShLIOp op) {
@@ -567,26 +600,27 @@ namespace {
                         ShiftLeftConversionPattern, OrIConversionPattern,
                         /*MoveConstantUp, */CallOpConversion>(&getContext());
 
-                if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
+                if (failed(applyPartialConversion(designOp, target, std::move(patterns)))) {
+                    llvm::errs() << "conversion fail" << "\n";
                     signalPassFailure();
+                }
             }
+            // {
+            //     ConversionTarget target(getContext());
+            //     RewritePatternSet patterns(&getContext());
 
-            {
-                ConversionTarget target(getContext());
-                RewritePatternSet patterns(&getContext());
+            //     target.addLegalDialect<tor::TORDialect>();
+            //     target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) {
+            //         if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
+            //             return false;
+            //         return true;
+            //     });
 
-                target.addLegalDialect<tor::TORDialect>();
-                target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) {
-                    if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
-                        return false;
-                    return true;
-                });
+            //     patterns.add<MoveConstantUp>(&getContext());
 
-                patterns.add<MoveConstantUp>(&getContext());
-
-                if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
-                    signalPassFailure();
-            }
+            //     if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
+            //         signalPassFailure();
+            // }
 
             // {
             //     designOp.walk([&](tor::FuncOp op) {

@@ -91,7 +91,8 @@ namespace {
                                     int width = log2(length);
                                     auto size = rewriter.create<ConstantIndexOp>(load.getLoc(), width);
                                     auto mul = rewriter.create<ShLIOp>(load.getLoc(), last_idx, size.getResult());
-                                    auto add = rewriter.create<OrIOp>(load.getLoc(), load.getIndices()[i], mul.getResult());
+                                    // auto add = rewriter.create<OrIOp>(load.getLoc(), load.getIndices()[i], mul.getResult());
+                                    auto add = rewriter.create<AddIOp>(load.getLoc(), load.getIndices()[i], mul.getResult());
                                     last_idx = add.getResult();
                                 } else {
                                     auto size = rewriter.create<ConstantIndexOp>(load.getLoc(), length);
@@ -115,7 +116,8 @@ namespace {
                                     int width = log2(length);
                                     auto size = rewriter.create<ConstantIndexOp>(store.getLoc(), width);
                                     auto mul = rewriter.create<ShLIOp>(store.getLoc(), last_idx, size.getResult());
-                                    auto add = rewriter.create<OrIOp>(store.getLoc(), store.getIndices()[i], mul.getResult());
+                                    // auto add = rewriter.create<OrIOp>(store.getLoc(), store.getIndices()[i], mul.getResult());
+                                    auto add = rewriter.create<AddIOp>(store.getLoc(), store.getIndices()[i], mul.getResult());
                                     last_idx = add.getResult();
                                 } else {
                                     auto size = rewriter.create<ConstantIndexOp>(store.getLoc(), length);
@@ -211,16 +213,83 @@ namespace {
         std::string top_function;
     };
 
+    struct MulIOpConversion : public OpConversionPattern<func::FuncOp> {
+        using OpConversionPattern<func::FuncOp>::OpConversionPattern;
+
+        LogicalResult
+        matchAndRewrite(func::FuncOp funcOp, func::FuncOp::Adaptor adaptor,
+                        ConversionPatternRewriter &rewriter) const override {
+            if (funcOp->getAttr("mul-convert"))
+                return failure();
+            SmallVector<std::pair<MulIOp, ShLIOp>> replace;
+            funcOp.walk([&](MulIOp op) {
+                auto val = op.getRhs();
+                APInt int_val;
+                if (matchPattern(val, m_ConstantInt(&int_val))) {
+                    if (int_val.isPowerOf2()) {
+                        int width = int_val.logBase2();
+                        rewriter.setInsertionPoint(op);
+                        auto constant = rewriter.create<ConstantIndexOp>(op.getLoc(), width);
+                        auto shift_left = rewriter.create<ShLIOp>(op.getLoc(), op.getLhs(), constant.getResult());
+                        // myReplaceOp(op, shift_left, rewriter);
+                        replace.push_back(std::make_pair(op, shift_left));
+                    }
+                }
+            });
+            for (auto &pair : replace) {
+                // rewriter.replaceOp(pair.first, {pair.second.getResult()});
+                // myReplaceOp(pair.first, pair.second, rewriter);
+                pair.first.getResult().replaceAllUsesWith(pair.second.getResult());
+                // funcOp.dump();
+            }
+            funcOp->setAttr("mul-convert",
+                        IntegerAttr::get(IntegerType::get(getContext(), 32), 1));
+            return success();
+        }
+    };
+
+    struct MulIOpErase : public OpConversionPattern<MulIOp> {
+        using OpConversionPattern<MulIOp>::OpConversionPattern;
+
+        LogicalResult
+        matchAndRewrite(MulIOp op, MulIOp::Adaptor adaptor,
+                        ConversionPatternRewriter &rewriter) const override {
+            if (!op.use_empty())
+                return failure();
+            rewriter.eraseOp(op);
+            return success();
+        }
+    };
+
     struct ConvertInputPass : ConvertInputBase<ConvertInputPass> {
         void runOnOperation() override {
             auto moduleOp = getOperation();
             moduleOp->setAttrs(DictionaryAttr::getWithSorted(&getContext(), {}));
 
             {
-                    RewritePatternSet Patterns(&getContext());
-                    Patterns.add<DesignOpPattern>(moduleOp.getContext(), top_function);
-                    if (failed(applyOpPatternsAndFold(moduleOp, std::move(Patterns))))
+                moduleOp.walk([&](func::FuncOp op) {
+                    RewritePatternSet Patterns(op.getContext());
+                    Patterns.add<MulIOpConversion>(op.getContext());
+                    if (failed(applyOpPatternsAndFold(op, std::move(Patterns))))
                         signalPassFailure();
+                });
+                ConversionTarget target(getContext());
+                RewritePatternSet patterns(&getContext());
+                target.addDynamicallyLegalOp<MulIOp>([](MulIOp op) {
+                    if (op.use_empty())
+                        return false;
+                    return true;
+                });
+                patterns.add<MulIOpErase>(&getContext());
+                if (failed(applyPartialConversion(moduleOp, target, std::move(patterns))))
+                        signalPassFailure();
+            }
+
+            {
+                RewritePatternSet Patterns(&getContext());
+                Patterns.add<DesignOpPattern>(moduleOp.getContext(), top_function);
+                if (failed(applyOpPatternsAndFold(moduleOp, std::move(Patterns))))
+                    signalPassFailure();
             }
 
             {

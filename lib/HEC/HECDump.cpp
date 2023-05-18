@@ -44,7 +44,6 @@ namespace {
         }
 
         string get_dump(Operation *op) {
-            op->dump();
             return string(op->getAttr("dump").dyn_cast<StringAttr>().getValue());
         }
 

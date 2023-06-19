@@ -97,6 +97,8 @@ namespace {
             expr = expr.floorDiv(factor);
         }
         auto map = AffineMap::get(arg_num.size(), 0, expr);
+        // idx.dump();
+        // map.dump();
         if (map.isConstant()) {
             return map.getConstantResults()[0];
         }

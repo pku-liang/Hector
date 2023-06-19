@@ -43,7 +43,8 @@ int SDCSchedule::resourceMII(Loop *L) {
       resII = std::max(resII, resPressure[i] / (int)RDB.getAmount(i));
     }
 
-  return resII;
+  // return resII;
+  return 1; // FIXME
 }
 
 int SDCSchedule::recurrenceMII(Loop *L) {
@@ -250,6 +251,8 @@ bool SDCSchedule::resolveResConstraint(Loop *L, int II, SDCSolver *SDC) {
 
   // keep the resource usage
   std::vector<std::vector<int>> ResTable(ResKind, std::vector<int>(II, 0));
+  std::vector<std::map<mlir::detail::ValueImpl*, int>> MemTable(II);
+
   std::vector<int> ResLimit(ResKind, 0);
   std::vector<bool> HardFlag(ResKind, 0);
   
@@ -329,21 +332,22 @@ bool SDCSchedule::resolveResConstraint(Loop *L, int II, SDCSolver *SDC) {
         if (RDB.getName(RId) == "memport") {
           // assume memory port has one cycle latency and can't be pipelined
           int slot = s % II;
-          for (auto &sdcOp : ScheduledMemOp[slot]) {
-            int dist = (s - sdcOp.second) / II;
+          // for (auto &sdcOp : ScheduledMemOp[slot]) {
+            // int dist = (s - sdcOp.second) / II;
             // check if op in current iteration can have resource conflict with
             // sdc op after dist iteraions.
 
-            if (hasMemPortConflict(op, sdcOp.first, dist)) {
-              for (int i = 0; i < RDB.getII(RId); ++i)
-                if (ResTable[RId][(s + i) % II] >= ResLimit[RId]) {
-                  avail = false;
-                  break;
-                }
-              if (avail == false)
+            // if (hasMemPortConflict(op, sdcOp.first, dist)) {
+            for (int i = 0; i < RDB.getII(RId); ++i) {
+              auto v = op->getMemOp()->getMemRef().getImpl();
+              if (MemTable[(slot + i) % II][v] >= ResLimit[RId]) {
+                avail = false;
                 break;
+              }
+            if (avail == false)
+              break;
             }
-          }
+          // }
         } else {
           for (int i = 0; i < RDB.getII(RId); ++i)
             if (ResTable[RId][(s + i) % II] >= ResLimit[RId]) {
@@ -363,7 +367,11 @@ bool SDCSchedule::resolveResConstraint(Loop *L, int II, SDCSolver *SDC) {
             ResTable[RId][(s + i) % II]++;
 
           if (RDB.getName(RId) == "memport")
-            ScheduledMemOp[s % II].push_back(std::make_pair(op, s));
+            for (int i = 0; i < RDB.getII(RId); ++i) {
+              auto v = op->getMemOp()->getMemRef().getImpl();
+              MemTable[(s + i) % II][v] += 1;
+              // ScheduledMemOp[s % II].push_back(std::make_pair(op, s));
+            }
 
           break;
         }
@@ -597,7 +605,7 @@ SDCSchedule::addResourceConstrBB(BasicBlock *BB,
                                  std::vector<std::vector<int>> &&Vars, int RId,
                                  SDCSolver *SDC) {
   int Amount = RDB.getAmount(RId);
-
+  
   std::vector<SDCOpWrapper *> constrainedOp = getFeasibleOrder(
       BB, [&](SDCOpWrapper *op) { return op->getResource() == RId; });
 
@@ -607,7 +615,7 @@ SDCSchedule::addResourceConstrBB(BasicBlock *BB,
     int slot = i % Amount;
     int Var = constrainedOp[i]->VarId;
     for (auto x : vec[slot])
-      SDC->addInitialConstraint(Constraint::CreateGE(Var, x, 1));
+      SDC->addInitialConstraint(Constraint::CreateGE(Var, x, RDB.getII(RId)));
     vec[slot] = {Var};
   }
 
@@ -809,7 +817,7 @@ SDCSolver *SDCSchedule::formulateSDC() {
   int NumResource = RDB.getNumResource();
 
   for (int i = 0; i < NumResource; ++i)
-    if (RDB.hasHardLimit(i))
+    if (RDB.hasHardLimit(i) && RDB.getName(i) != "memport")
       addResourceConstr(i, SDC);
 
   addMemConstr(SDC);

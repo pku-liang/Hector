@@ -1,3 +1,4 @@
+#include "TOR/TOR.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -22,6 +23,7 @@
 
 #include <set>
 #include <iostream>
+#include <type_traits>
 
 #define DEBUG_TYPE "scf-to-tor"
 
@@ -49,6 +51,75 @@ namespace {
         // rewriter.eraseOp(op);
     }
 
+    template<typename SourceOp>
+    struct IndexTypeConversionPattern: public OpConversionPattern<SourceOp> {
+        using OpConversionPattern<SourceOp>::OpConversionPattern;
+        SmallVector<Value> prepareOperands(SourceOp op, typename SourceOp::Adaptor adaptor, ConversionPatternRewriter & rewriter) const {
+            auto operands = adaptor.getOperands();
+            SmallVector<Type> newOperandTypes;
+            auto converter = this->getTypeConverter();
+            (void) converter->convertTypes(op->getOperandTypes(), newOperandTypes);
+            return llvm::to_vector(llvm::map_range(llvm::zip(operands, newOperandTypes), [&](auto it) {
+                auto [operand, tpe] = it;
+                return converter->materializeSourceConversion(rewriter, op->getLoc(), tpe, ValueRange(operand));
+            }));
+        }
+    };
+    struct YieldOpConversion : public IndexTypeConversionPattern<scf::YieldOp> {
+        using IndexTypeConversionPattern<scf::YieldOp>::IndexTypeConversionPattern;
+        LogicalResult matchAndRewrite(scf::YieldOp op, typename scf::YieldOp::Adaptor adaptor, ConversionPatternRewriter & rewriter) const final {
+            auto operands = this->prepareOperands(op, adaptor, rewriter);
+            auto newOp = rewriter.replaceOpWithNewOp<tor::YieldOp>(op, operands);
+            newOp->setAttr("dump", op->getAttr("dump"));
+            return success();
+        }
+    };
+    struct CondOpConversion : public IndexTypeConversionPattern<scf::ConditionOp> {
+        using IndexTypeConversionPattern<scf::ConditionOp>::IndexTypeConversionPattern;
+        LogicalResult matchAndRewrite(scf::ConditionOp op, typename scf::ConditionOp::Adaptor adaptor, ConversionPatternRewriter & rewriter) const final {
+            auto operands = this->prepareOperands(op, adaptor, rewriter);
+            auto newOp = rewriter.replaceOpWithNewOp<tor::ConditionOp>(op, operands[0], ValueRange(operands).drop_front(1));
+            newOp->setAttr("dump", op->getAttr("dump"));
+            return success();
+        }
+    };
+    template<typename SourceOp, typename TargetOp>
+    struct BinOpConversionPattern: public IndexTypeConversionPattern<SourceOp> {
+        using IndexTypeConversionPattern<SourceOp>::IndexTypeConversionPattern;
+        LogicalResult matchAndRewrite(SourceOp op, typename SourceOp::Adaptor adaptor, ConversionPatternRewriter & rewriter) const final {
+            auto operands = this->prepareOperands(op, adaptor, rewriter);
+            auto resType = this->getTypeConverter()->convertType(op->getResult(0).getType());
+            auto newOp = rewriter.replaceOpWithNewOp<TargetOp>(op, resType, operands[0], operands[1], 0, 0);
+            newOp->setAttr("dump", op->getAttr("dump"));
+            return success();
+        }
+    };
+    using MulIOpConversion  = BinOpConversionPattern<MulIOp, tor::MulIOp>;
+    using AddIOpConversion  = BinOpConversionPattern<AddIOp, tor::AddIOp>;
+    using SubIOpConversion  = BinOpConversionPattern<SubIOp, tor::SubIOp>;
+    using MulFOpConversion  = BinOpConversionPattern<MulFOp, tor::MulFOp>;
+    using AddFOpConversion  = BinOpConversionPattern<AddFOp, tor::AddFOp>;
+    using SubFOpConversion  = BinOpConversionPattern<SubFOp, tor::SubFOp>;
+    using DivFOpConversion  = BinOpConversionPattern<DivFOp, tor::DivFOp>;
+    template<typename SourceOp>
+    struct SimpleOpConversion: public IndexTypeConversionPattern<SourceOp> {
+        using IndexTypeConversionPattern<SourceOp>::IndexTypeConversionPattern;
+        LogicalResult matchAndRewrite(SourceOp op, typename SourceOp::Adaptor adaptor, ConversionPatternRewriter & rewriter) const final {
+            if(!llvm::any_of(op.getOperandTypes(), [](auto tpe){return isa<IndexType>(tpe);}))
+                return failure();
+            auto operands = this->prepareOperands(op, adaptor, rewriter);
+            SmallVector<Type> resultTypes;
+            (void) this->getTypeConverter()->convertTypes(op->getResultTypes(), resultTypes);
+            rewriter.replaceOpWithNewOp<SourceOp>(op, resultTypes, operands, op->getAttrs());
+            return success();
+        }
+    };
+    using ShiftLeftConversionPattern = SimpleOpConversion<ShLIOp>;
+    using OrIConversionPattern = SimpleOpConversion<OrIOp>;
+    using SelectConversionPattern = SimpleOpConversion<SelectOp>;
+    using LoadOpConversion = SimpleOpConversion<tor::LoadOp>;
+    using StoreOpConversion = SimpleOpConversion<tor::StoreOp>;
+
     struct ConstIndexConversion : public OpConversionPattern<ConstantOp> {
         using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
@@ -72,25 +143,6 @@ namespace {
             }
 
             return failure();
-        }
-    };
-
-    struct YieldOpConversion : public OpConversionPattern<scf::YieldOp> {
-        using OpConversionPattern<scf::YieldOp>::OpConversionPattern;
-
-        LogicalResult
-        matchAndRewrite(scf::YieldOp op, scf::YieldOp::Adaptor adaptor,
-                        ConversionPatternRewriter &rewriter) const override {
-            auto operands = adaptor.getOperands();
-            for (auto opr : operands)
-                if (opr.getType().isa<IndexType>())
-                    return failure();
-
-            rewriter.setInsertionPoint(op);
-            rewriter.create<tor::YieldOp>(op.getLoc(), operands);
-            rewriter.eraseOp(op);
-
-            return success();
         }
     };
 
@@ -128,26 +180,6 @@ namespace {
             }
 
             rewriter.replaceOp(op, newOp.getResults());
-
-            return success();
-        }
-    };
-
-    struct CondOpConversion : public OpConversionPattern<scf::ConditionOp> {
-        using OpConversionPattern<scf::ConditionOp>::OpConversionPattern;
-
-        LogicalResult
-        matchAndRewrite(scf::ConditionOp op, scf::ConditionOp::Adaptor adaptor,
-                        ConversionPatternRewriter &rewriter) const override {
-            auto operands = adaptor.getOperands();
-            for (auto opr : operands)
-                if (opr.getType().isa<IndexType>())
-                    return failure();
-
-            rewriter.create<tor::ConditionOp>(op.getLoc(), operands[0],
-                                              operands.drop_front(1));
-
-            rewriter.eraseOp(op);
 
             return success();
         }
@@ -268,67 +300,6 @@ namespace {
             return success();
         }
     };
-    template<typename SourceOp, typename TargetOp>
-    struct BinIOpConversion : public OpConversionPattern<SourceOp> {
-        using OpConversionPattern<SourceOp>::OpConversionPattern;
-
-        LogicalResult
-        matchAndRewrite(SourceOp op, typename SourceOp::Adaptor adaptor,
-                        ConversionPatternRewriter &rewriter) const override {
-            auto operands = adaptor.getOperands();
-            assert(operands.size() == 2 && "addi has two operand");
-            for (auto opr : operands) {
-                if (opr.getType().template isa<IndexType>())
-                    return failure();
-            }
-
-            rewriter.setInsertionPoint(op);
-
-            TargetOp newOp;
-            if (op.getResult().getType().template isa<IndexType>())
-                newOp = rewriter.create<TargetOp>(op.getLoc(), operands[0], operands[1]);
-            else
-                newOp = rewriter.create<TargetOp>(op.getLoc(), op.getResult().getType(),
-                                                  operands[0], operands[1], 0, 0);
-            // op->dump();
-            newOp->setAttr("dump", op->getAttr("dump"));
-
-            // rewriter.replaceOp(op, newOp.getResult());
-            myReplaceOp(op, newOp, rewriter);
-            // newOp->getParentOp()->dump();
-            return success();
-        }
-    };
-
-    template<typename SourceOp, typename TargetOp>
-    struct BinFOpConversion : public OpConversionPattern<SourceOp> {
-        using OpConversionPattern<SourceOp>::OpConversionPattern;
-
-        LogicalResult
-        matchAndRewrite(SourceOp op, typename SourceOp::Adaptor adaptor,
-                        ConversionPatternRewriter &rewriter) const override {
-            auto operands = adaptor.getOperands();
-            rewriter.setInsertionPoint(op);
-
-            TargetOp newOp = rewriter.create<TargetOp>(
-                    op.getLoc(), op.getResult().getType(), operands[0], operands[1], 0, 0);
-            newOp->setAttr("dump", op->getAttr("dump"));
-
-            // rewriter.replaceOp(op, newOp.getResult());
-            myReplaceOp(op, newOp, rewriter);
-
-            return success();
-        }
-    };
-
-    using MulIOpConversion = BinIOpConversion<MulIOp, tor::MulIOp>;
-    using AddIOpConversion = BinIOpConversion<AddIOp, tor::AddIOp>;
-    using SubIOpConversion = BinIOpConversion<SubIOp, tor::SubIOp>;
-    using MulFOpConversion = BinFOpConversion<MulFOp, tor::MulFOp>;
-    using AddFOpConversion = BinFOpConversion<AddFOp, tor::AddFOp>;
-    using SubFOpConversion = BinFOpConversion<SubFOp, tor::SubFOp>;
-    using DivFOpConversion = BinFOpConversion<DivFOp, tor::DivFOp>;
-
     struct CmpIOpConversion : public OpConversionPattern<CmpIOp> {
         using OpConversionPattern<CmpIOp>::OpConversionPattern;
 
@@ -378,51 +349,6 @@ namespace {
             return success();
         }
     };
-
-    struct CastOpErasure : public OpConversionPattern<IndexCastOp> {
-        using OpConversionPattern<IndexCastOp>::OpConversionPattern;
-
-        LogicalResult
-        matchAndRewrite(IndexCastOp op, IndexCastOp::Adaptor adaptor,
-                        ConversionPatternRewriter &rewriter) const override {
-            auto operands = adaptor.getOperands();
-            if (operands[0].getType().isa<IndexType>())
-                return failure();
-
-            // rewriter.replaceOp(op, operands);
-            op.getResult().replaceAllUsesWith(operands[0]);
-            rewriter.eraseOp(op);
-            return success();
-        }
-    };
-
-    template<typename Op>
-    struct BinaryIOpConversion : public OpConversionPattern<Op> {
-        using OpConversionPattern<Op>::OpConversionPattern;
-
-        LogicalResult
-        matchAndRewrite(Op op, typename Op::Adaptor adaptor,
-                        ConversionPatternRewriter &rewriter) const override {
-            auto operands = adaptor.getOperands();
-            for (auto opr : operands)
-                if (opr.getType().template isa<IndexType>())
-                    return failure();
-            if (!op.getResult().getType().template isa<IndexType>())
-                return failure();
-            
-            auto newOp =
-                    rewriter.create<Op>(op.getLoc(), operands[0], operands[1]);
-            newOp->setAttr("dump", op->getAttr("dump"));
-
-
-            // rewriter.replaceOp(op, newOp.getResult());
-            myReplaceOp(op, newOp, rewriter);
-            // llvm::outs() << "Yeh!\n";
-            return success();
-        }
-    };
-    using ShiftLeftConversionPattern = BinaryIOpConversion<ShLIOp>;
-    using OrIConversionPattern = BinaryIOpConversion<OrIOp>;
 
     struct FuncOpPattern : public OpConversionPattern<tor::FuncOp> {
         using OpConversionPattern<tor::FuncOp>::OpConversionPattern;
@@ -567,23 +493,20 @@ namespace {
                 
 
                 target.addLegalDialect<tor::TORDialect>();
-                target.addDynamicallyLegalOp<ShLIOp>([](ShLIOp op) {
-                    if (op.getResult().getType().isa<IndexType>())
+                auto hasIndexType = [](Operation * op) {
+                    if(llvm::any_of(op->getOperandTypes(), [&](auto tpe){return isa<IndexType>(tpe);})) {
                         return false;
-                    return true;
-                });
-                target.addDynamicallyLegalOp<OrIOp>([](OrIOp op) {
-                    if (op.getResult().getType().isa<IndexType>())
+                    }
+                    if(llvm::any_of(op->getResultTypes(), [&](auto tpe){return isa<IndexType>(tpe);})) {
                         return false;
+                    }
                     return true;
-                });
-                target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) {
-                    if (op.getResult().getType().isa<IndexType>())
-                        return false;
-                    // if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
-                    //     return false;
-                    return true;
-                });
+                };
+                target.addDynamicallyLegalOp<ShLIOp>(hasIndexType);
+                target.addDynamicallyLegalOp<OrIOp>(hasIndexType);
+                target.addDynamicallyLegalOp<ConstantOp>(hasIndexType);
+                target.addDynamicallyLegalOp<tor::LoadOp>(hasIndexType);
+                target.addDynamicallyLegalOp<tor::StoreOp>(hasIndexType);
                 target.addDynamicallyLegalOp<tor::FuncOp>([](tor::FuncOp op) {
                     for (auto type : op.getArgumentTypes())
                         if (type.isa<IndexType>())
@@ -596,31 +519,32 @@ namespace {
                         AddFOpConversion, SubFOpConversion, DivFOpConversion,
                         YieldOpConversion, CondOpConversion, WhileOpConversion,
                         ForOpConversion, IfOpConversion, FuncOpPattern,
-                        CastOpErasure, CmpFOpConversion,
-                        ShiftLeftConversionPattern, OrIConversionPattern,
-                        /*MoveConstantUp, */CallOpConversion>(&getContext());
+                        CmpFOpConversion,
+                        ShiftLeftConversionPattern, OrIConversionPattern, SelectConversionPattern,
+                        LoadOpConversion, StoreOpConversion,
+                        /*MoveConstantUp, */CallOpConversion>(converter, &getContext());
 
                 if (failed(applyPartialConversion(designOp, target, std::move(patterns)))) {
                     llvm::errs() << "conversion fail" << "\n";
                     signalPassFailure();
                 }
             }
-            // {
-            //     ConversionTarget target(getContext());
-            //     RewritePatternSet patterns(&getContext());
+            {
+                ConversionTarget target(getContext());
+                RewritePatternSet patterns(&getContext());
 
-            //     target.addLegalDialect<tor::TORDialect>();
-            //     target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) {
-            //         if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
-            //             return false;
-            //         return true;
-            //     });
+                target.addLegalDialect<tor::TORDialect>();
+                target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) {
+                    if (!llvm::isa<tor::DesignOp>(op->getParentOp()))
+                        return false;
+                    return true;
+                });
 
-            //     patterns.add<MoveConstantUp>(&getContext());
+                patterns.add<MoveConstantUp>(&getContext());
 
-            //     if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
-            //         signalPassFailure();
-            // }
+                if (failed(applyPartialConversion(designOp, target, std::move(patterns))))
+                    signalPassFailure();
+            }
 
             // {
             //     designOp.walk([&](tor::FuncOp op) {

@@ -1,3 +1,4 @@
+#include <iterator>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <algorithm>
@@ -497,6 +498,25 @@ namespace mlir {
                                 conflicts[*ptr].push_back(*ptrj);
                                 conflicts[*ptrj].push_back(*ptr);
                             }
+                }
+            }
+
+            void analyze_cell() {
+                conflicts.resize(m);
+                for (unsigned i = 0; i < n; i++) {
+                    for (auto succ : edges[i]) {
+                        std::vector<unsigned> used;
+                        std::set_intersection(def[i].begin(), def[i].end(), use[succ].begin(), use[succ].end(), 
+                                std::insert_iterator<std::vector<unsigned>>(used, used.begin()));
+                        for (auto L = used.begin(); L != used.end(); L++) {
+                            for (auto R = L; R != used.end(); R++) {
+                                if (L != R) {
+                                    conflicts[*L].push_back(*R);
+                                    conflicts[*R].push_back(*L);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1231,6 +1251,17 @@ namespace mlir {
                 }
             }
 
+            int find_first(size_t begin, size_t end) {
+                if (begin == end) {
+                    return 0;
+                }
+                for (auto succ : nodes[begin].edges) {
+                    if (find_first(succ.to, end) != -1)
+                        return succ.to;
+                }
+                return -1;
+            }
+
             void allocate_cells() {
                 if (style == Style::NORMAL) {
                     std::set<std::string> allocated;
@@ -1245,15 +1276,17 @@ namespace mlir {
                                     idList.push_back(ptrj->id);
                                     unsigned id = idList.size() - 1;
                                     dataflow.addDef(id, ptrj->t);
-                                    dataflow.addUse(id, ptrj->tend);
+                                    dataflow.addUse(id, find_first(ptrj->t, ptrj->tend));
+                                    std::cerr << "set " << ptrj->t << " " << ptrj->tend << "->" << find_first(ptrj->t, ptrj->tend) << std::endl;
+                                    //dataflow.addUse(id, ptrj->tend);
                                 }
-                            dataflow.analysize();
+                            dataflow.analyze_cell();
                             std::vector<unsigned> coloring = dataflow.colorize();
 
                             for (unsigned i = 0, m = idList.size(); i < m; i++) {
                                 cells[idList[i]].cname += "_" + std::to_string(coloring[i]);
-                                // std::cerr << "set cell " << idList[i] << " has cname "
-                                        //   << cells[idList[i]].cname << std::endl;
+                                 std::cerr << "set cell " << idList[i] << " has cname "
+                                           << cells[idList[i]].cname << std::endl;
                             }
                         }
                 } else {

@@ -354,7 +354,7 @@ void ScheduleBase::buildDFG() {
       } 
       
       // memop1 can reach memop2 without loop-back edge
-      if (!annotated && canReach(memop1, memop2, false))
+      if (canReach(memop1, memop2, false))
         Distance = 0;
 
       // memop1 can reach memop2 using some loop-back edge,

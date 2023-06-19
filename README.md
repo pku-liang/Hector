@@ -10,7 +10,7 @@ git checkout cbc378ecb87e3f31dd5aff91f2a621d500640412
 ```
 
 2. Clone the project
-   `git clone https://github.com/pku-liang/Hector.git`
+   `git clone https://github.com/xuruifan/Hermes.git`
 
 3. Get the submodules
 
@@ -28,7 +28,7 @@ cmake -G Ninja .. -DMLIR_DIR=<LLVM_DIR>/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT
 ninja
 ```
 
-5. Chisel templates from https://github.com/xuruifan/Hermes.git
+5. Chisel templates from https://github.com/xuruifan/hector_template/
 
 ## Run examples
 

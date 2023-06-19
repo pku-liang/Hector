@@ -28,7 +28,7 @@ cmake -G Ninja .. -DMLIR_DIR=<LLVM_DIR>/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT
 ninja
 ```
 
-5. Chisel templates from https://github.com/xuruifan/hector_template/
+5. Chisel templates from https://github.com/xuruifan/Hermes.git
 
 ## Run examples
 

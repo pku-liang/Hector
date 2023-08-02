@@ -1,9 +1,9 @@
 #ifndef SCHEDULE_RESOURCEDB_H
 #define SCHEDULE_RESOURCEDB_H
 
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
 #include "nlohmann/json.hpp"
@@ -50,12 +50,16 @@ public:
       return NameToID[name];
 
     if (auto callOp = llvm::dyn_cast<mlir::func::CallOp>(op)) {
+      return NameToID["call"];
+      // FIXME: Here we assume callop's latency is 1. The following code
+      // should be used after we compute the latency for each function.
+      /*
       auto func = callOp.getCallee().str();
       if (NameToID.find(func) != NameToID.end())
         return NameToID[func];
+      */
     }
 
-    llvm::errs() << name << "\n";
     return NameToID["nop"];
     // llvm::errs() << name << "\n";
     // assert(0 && "Error: Can't find corresponding resource");
@@ -111,7 +115,7 @@ public:
   bool hasResConstr(int id) { return Components[id].constr == true; }
 
   bool hasHardLimit(int id) { return Components[id].amount != -1; }
-  
+
   void addComponent(const Component &c) { Components.push_back(c); }
 
   ResourceDB() {
@@ -129,7 +133,7 @@ public:
       int amount = -1;
       int II = 0;
       bool constr = 0;
-      
+
       for (auto &item : info.items()) {
         if (item.key() == "delay") {
           for (auto &f : item.value().items())
@@ -141,8 +145,8 @@ public:
         } else if (item.key() == "II") {
           II = item.value().get<int>();
         } else if (item.key() == "constr") {
-	  constr = item.value().get<int>();
-	}
+          constr = item.value().get<int>();
+        }
       }
 
       addComponent(Component(name, delay, latency, II, constr, amount));

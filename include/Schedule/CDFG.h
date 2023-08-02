@@ -74,6 +74,7 @@ public:
 public:
   enum class OpType {
     DEFINED_OP,
+    CALL_OP,
     PHI_OP,    /// x = phi(a, b) in [if, while, for]
     ASSIGN_OP, /// x = y in [yield]
     INC_OP,    /// x = x + step in [for]
@@ -94,7 +95,7 @@ public:
   virtual void addPred(Dependence *D) = 0;
   virtual void addSucc(Dependence *D) = 0;
   virtual void printName(llvm::raw_ostream &os) {
-    if (getType() == OpType::DEFINED_OP) {
+    if (getType() == OpType::DEFINED_OP || getType() == OpType::CALL_OP) {
       getOp()->dump();
     } else if (getType() == OpType::PHI_OP)
       os << "PHI_OP\n";
@@ -248,7 +249,8 @@ public:
     return type == OpType::LOAD_OP || type == OpType::STORE_OP;
   }
 
-  std::unordered_map<int, int> Dependences;  
+  std::unordered_map<int, int> Dependences;
+
 private:
   Value memref;
   Value addr;

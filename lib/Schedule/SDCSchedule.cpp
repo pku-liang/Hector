@@ -1,11 +1,14 @@
-#include "Schedule/SDCSchedule.h"
-#include "Schedule/CDFG.h"
-#include "Schedule/SDCSolver.h"
-#include "lp_lib.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include <map>
 #include <queue>
 #include <set>
+
+// FIXME: Macro LE in lp_lib.h conflicts with variables in llvm. Changing the
+// include order is an ad-hoc solution but doesn't really solve the problem.
+#include "Schedule/CDFG.h"
+#include "Schedule/SDCSchedule.h"
+#include "Schedule/SDCSolver.h"
+#include "lp_lib.h"
 #include <unordered_map>
 
 // Fix bug in Windows
@@ -39,7 +42,8 @@ int SDCSchedule::resourceMII(Loop *L) {
 
   for (int i = 1; i < ResourceKind; ++i)
     if (RDB.hasHardLimit(i)) {
-      llvm::outs() << RDB.getName(i) << " " << resPressure[i] << " " << RDB.getAmount(i) << "\n";
+      llvm::outs() << RDB.getName(i) << " " << resPressure[i] << " "
+                   << RDB.getAmount(i) << "\n";
       resII = std::max(resII, resPressure[i] / (int)RDB.getAmount(i));
     }
 
@@ -105,26 +109,26 @@ void SDCSchedule::formulateDependency(Loop *L, int II, SDCSolver *SDC) {
       for (auto pred : op->getPred())
         if (sameLoop(pred)) {
           auto srcOp = llvm::dyn_cast<SDCOpWrapper>(pred->SourceOp);
-	        int RId = srcOp->getResource();
+          int RId = srcOp->getResource();
           int Lat = RDB.getLatency(RId);
 
-	        // This special case is because of codegen backend
+          // This special case is because of codegen backend
           if (srcOp->getType() == OpAbstract::OpType::PHI_OP)
             Lat = 1;
-            if (Lat == 0) {
-              if (RDB.getLatency(destOp->getResource()) == 0)
-                SDC->addInitialConstraint(Constraint::CreateGE(
-                    destOp->VarId, srcOp->VarId, -II * pred->Distance));
-              else
-                SDC->addInitialConstraint(Constraint::CreateGE(
-                    destOp->VarId, srcOp->VarId, 1 - II * pred->Distance));
-            } else {
+          if (Lat == 0) {
+            if (RDB.getLatency(destOp->getResource()) == 0)
               SDC->addInitialConstraint(Constraint::CreateGE(
-                  destOp->VarId, srcOp->VarId, Lat - II * pred->Distance));
-            }
-              // srcOp->printName(llvm::outs());
-              // destOp->printName(llvm::outs());
-              // llvm::outs() << Lat << " " << pred->Distance << "\n";
+                  destOp->VarId, srcOp->VarId, -II * pred->Distance));
+            else
+              SDC->addInitialConstraint(Constraint::CreateGE(
+                  destOp->VarId, srcOp->VarId, 1 - II * pred->Distance));
+          } else {
+            SDC->addInitialConstraint(Constraint::CreateGE(
+                destOp->VarId, srcOp->VarId, Lat - II * pred->Distance));
+          }
+          // srcOp->printName(llvm::outs());
+          // destOp->printName(llvm::outs());
+          // llvm::outs() << Lat << " " << pred->Distance << "\n";
         }
     }
 
@@ -251,26 +255,26 @@ bool SDCSchedule::resolveResConstraint(Loop *L, int II, SDCSolver *SDC) {
 
   // keep the resource usage
   std::vector<std::vector<int>> ResTable(ResKind, std::vector<int>(II, 0));
-  std::vector<std::map<mlir::detail::ValueImpl*, int>> MemTable(II);
+  std::vector<std::map<mlir::detail::ValueImpl *, int>> MemTable(II);
 
   std::vector<int> ResLimit(ResKind, 0);
   std::vector<bool> HardFlag(ResKind, 0);
-  
-  for (int i = 0; i < ResKind; ++i) 
+
+  for (int i = 0; i < ResKind; ++i)
     if (RDB.hasResConstr(i)) {
       if (RDB.hasHardLimit(i)) {
-	ResLimit[i] = RDB.getAmount(i);
-	HardFlag[i] = 1;
+        ResLimit[i] = RDB.getAmount(i);
+        HardFlag[i] = 1;
       } else {
-	int NumOp = 0;
-	for (auto BB : L->getBody())
-	  for (auto op : BB->getOperations())
-	    if (op->getResource() == i)
-	      NumOp++;
-	ResLimit[i] = (NumOp + II - 1) / II;
+        int NumOp = 0;
+        for (auto BB : L->getBody())
+          for (auto op : BB->getOperations())
+            if (op->getResource() == i)
+              NumOp++;
+        ResLimit[i] = (NumOp + II - 1) / II;
       }
     }
-  
+
   // keep the scheduled memop
   std::vector<std::vector<std::pair<SDCOpWrapper *, int>>> ScheduledMemOp(II);
 
@@ -333,20 +337,20 @@ bool SDCSchedule::resolveResConstraint(Loop *L, int II, SDCSolver *SDC) {
           // assume memory port has one cycle latency and can't be pipelined
           int slot = s % II;
           // for (auto &sdcOp : ScheduledMemOp[slot]) {
-            // int dist = (s - sdcOp.second) / II;
-            // check if op in current iteration can have resource conflict with
-            // sdc op after dist iteraions.
+          // int dist = (s - sdcOp.second) / II;
+          // check if op in current iteration can have resource conflict with
+          // sdc op after dist iteraions.
 
-            // if (hasMemPortConflict(op, sdcOp.first, dist)) {
-            for (int i = 0; i < RDB.getII(RId); ++i) {
-              auto v = op->getMemOp()->getMemRef().getImpl();
-              if (MemTable[(slot + i) % II][v] >= ResLimit[RId]) {
-                avail = false;
-                break;
-              }
-            if (avail == false)
+          // if (hasMemPortConflict(op, sdcOp.first, dist)) {
+          for (int i = 0; i < RDB.getII(RId); ++i) {
+            auto v = op->getMemOp()->getMemRef().getImpl();
+            if (MemTable[(slot + i) % II][v] >= ResLimit[RId]) {
+              avail = false;
               break;
             }
+            if (avail == false)
+              break;
+          }
           // }
         } else {
           for (int i = 0; i < RDB.getII(RId); ++i)
@@ -605,7 +609,7 @@ SDCSchedule::addResourceConstrBB(BasicBlock *BB,
                                  std::vector<std::vector<int>> &&Vars, int RId,
                                  SDCSolver *SDC) {
   int Amount = RDB.getAmount(RId);
-  
+
   std::vector<SDCOpWrapper *> constrainedOp = getFeasibleOrder(
       BB, [&](SDCOpWrapper *op) { return op->getResource() == RId; });
 
@@ -890,21 +894,21 @@ bool SDCSchedule::resolveResourceConstraintFunction(int II, SDCSolver *SDC) {
   std::vector<std::vector<int>> ResTable(ResKind, std::vector<int>(II, 0));
   std::vector<int> ResLimit(ResKind, 0);
   std::vector<bool> HardFlag(ResKind, 0);
-  
-  for (int i = 0; i < ResKind; ++i) 
+
+  for (int i = 0; i < ResKind; ++i)
     if (RDB.hasResConstr(i)) {
       if (RDB.hasHardLimit(i)) {
-	ResLimit[i] = RDB.getAmount(i);
-	HardFlag[i] = 1;
+        ResLimit[i] = RDB.getAmount(i);
+        HardFlag[i] = 1;
       } else {
-	int NumOp = 0;
-	for (auto &&op : SDCOperations)
-	  if (op->getResource() == i)
-	    NumOp++;
-	ResLimit[i] = (NumOp + II - 1) / II;
+        int NumOp = 0;
+        for (auto &&op : SDCOperations)
+          if (op->getResource() == i)
+            NumOp++;
+        ResLimit[i] = (NumOp + II - 1) / II;
       }
     }
-  
+
   // keep the scheduled memop
   std::vector<std::vector<std::pair<SDCOpWrapper *, int>>> ScheduledMemOp(II);
 
@@ -1057,9 +1061,9 @@ bool SDCSchedule::pipelineFunctionWithII(int II, bool FinalFlag) {
       int Lat = RDB.getLatency(predOp->getResource());
       // This special case is because of codegen backend
       if (predOp->getType() == OpAbstract::OpType::PHI_OP)
-	Lat = 1;
-      SDC->addInitialConstraint(Constraint::CreateGE(
-          succOp->VarId, predOp->VarId, Lat));
+        Lat = 1;
+      SDC->addInitialConstraint(
+          Constraint::CreateGE(succOp->VarId, predOp->VarId, Lat));
     }
   }
 
@@ -1073,16 +1077,15 @@ bool SDCSchedule::pipelineFunctionWithII(int II, bool FinalFlag) {
   SDC->initSolution();
   for (auto &&op : SDCOperations)
     op->ASAPTime = SDC->Solution[op->VarId];
-  
+
   if (minimizeLifetimeFunction(II, SDC) == false)
     return false;
-  
+
   for (auto &&sdcOp : SDCOperations) {
-    llvm::outs() << sdcOp->getOp()->getName() << " "
-		 << sdcOp->ASAPTime << " "
-		 << sdcOp->OptTime << "\n";
+    llvm::outs() << sdcOp->getOp()->getName() << " " << sdcOp->ASAPTime << " "
+                 << sdcOp->OptTime << "\n";
   }
-      
+
   if (resolveResourceConstraintFunction(II, SDC) == false)
     return false;
   if (FinalFlag) {
@@ -1102,7 +1105,7 @@ bool SDCSchedule::pipelineFunction() {
     llvm::outs() << "Achieved II: " << targetII << "\n";
     containingOp->setAttr(
         "II", IntegerAttr::get(IntegerType::get(containingOp->getContext(), 32),
-                               targetII));    
+                               targetII));
     pipelineFunctionWithII(targetII, true);
     return true;
   }
@@ -1138,13 +1141,15 @@ LogicalResult SDCSchedule::runSchedule() {
   buildFromContainingOp();
 
   SDCOperations = initSchedule<SDCOpWrapper>();
-  
-  if (auto pipeline_flag = containingOp->getAttrOfType<StringAttr>("pipeline")) {
+
+  if (auto pipeline_flag =
+          containingOp->getAttrOfType<StringAttr>("pipeline")) {
     // pipeline this function
     if (pipeline_flag.getValue().str() == "func") {
       if (pipelineFunction())
-	return success();
-      llvm::outs() << containingOp->getName() << ". Function pipelining failed!\n";
+        return success();
+      llvm::outs() << containingOp->getName()
+                   << ". Function pipelining failed!\n";
       return failure();
     }
   }

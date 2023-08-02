@@ -1,40 +1,39 @@
 #ifndef SCHEDULE_ALGO_H
 #define SCHEDULE_ALGO_H
 
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringMap.h"
 
+#include "Schedule/CDFG.h"
+#include "Schedule/ResourceDB.h"
+#include "TOR/TOR.h"
+#include "TOR/TORTypes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/LLVM.h"
-#include "TOR/TOR.h"
-#include "TOR/TORTypes.h"
-#include "Schedule/CDFG.h"
-#include "Schedule/ResourceDB.h"
+#include "mlir/Support/LogicalResult.h"
 
 #include "nlohmann/json.hpp"
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <memory>
 #include <unordered_map>
 #include <vector>
-#include <memory>
 
-namespace scheduling{
+namespace scheduling {
 
 using std::unique_ptr;
 using namespace mlir;
 
-/// This is a template Base class of Schedule Algorithm. Every implementation of 
-/// schedule algorithm should inherit from this class. template parameter must be 
-/// a child class of OpWrapperBase.
-/// This class contains some basic constraints about the scheduling problem.
-/// Can access schedule result from OpAbstract
-/// Can access OpAbstract via result value from ValueMap
+/// This is a template Base class of Schedule Algorithm. Every implementation of
+/// schedule algorithm should inherit from this class. template parameter must
+/// be a child class of OpWrapperBase. This class contains some basic
+/// constraints about the scheduling problem. Can access schedule result from
+/// OpAbstract Can access OpAbstract via result value from ValueMap
 class ScheduleBase {
 public:
   explicit ScheduleBase(Operation *op) {
@@ -52,14 +51,14 @@ public:
     else
       assert(0 && "A clock period must be specified");
 
-    std::string filename;    
+    std::string filename;
     if (auto attr = funcOp->getAttrOfType<mlir::StringAttr>("resource"))
       filename = attr.getValue().str();
     else
       assert(0 && "A path to the resource constraint file must be specified\n");
 
     std::ifstream istrm(filename, std::ios::in);
-    
+
     nlohmann::json config;
     istrm >> config;
     RDB = ResourceDB(config);
@@ -71,24 +70,23 @@ public:
   virtual LogicalResult verify();
 
   virtual void buildFromContainingOp();
-  
-  OpAbstract *createOp(Operation *op, Loop *ParentLoop, BasicBlock *ParentBB, 
-                       ArrayRef<Value> Results, ArrayRef<Value> Operands, 
-                       OpAbstract::OpType type = OpAbstract::OpType::DEFINED_OP) 
-  {
+
+  OpAbstract *
+  createOp(Operation *op, Loop *ParentLoop, BasicBlock *ParentBB,
+           ArrayRef<Value> Results, ArrayRef<Value> Operands,
+           OpAbstract::OpType type = OpAbstract::OpType::DEFINED_OP) {
     int rsc = 0;
     switch (type) {
-      case OpAbstract::OpType::PHI_OP:
-      case OpAbstract::OpType::ASSIGN_OP:
-        rsc = RDB.getResourceID("nop");
-        break;
-      default:
-        rsc = RDB.getResourceID(op);
+    case OpAbstract::OpType::PHI_OP:
+    case OpAbstract::OpType::ASSIGN_OP:
+      rsc = RDB.getResourceID("nop");
+      break;
+    default:
+      rsc = RDB.getResourceID(op);
     }
 
-    Operations.push_back(
-        std::make_unique<OpConcrete>(
-            OpConcrete(op, ParentLoop, ParentBB, rsc, Results, Operands, type)));
+    Operations.push_back(std::make_unique<OpConcrete>(
+        OpConcrete(op, ParentLoop, ParentBB, rsc, Results, Operands, type)));
 
     OpAbstract *newop = Operations.back().get();
 
@@ -106,16 +104,15 @@ public:
 
     return newop;
   }
-  
+
   OpAbstract *createMemOp(Operation *op, Loop *ParentLoop, BasicBlock *ParentBB,
                           ArrayRef<Value> Results, ArrayRef<Value> Operands,
-                          OpAbstract::OpType type, ArrayRef<int> DepSigs, ArrayRef<int> DepDists)
-  {
+                          OpAbstract::OpType type, ArrayRef<int> DepSigs,
+                          ArrayRef<int> DepDists) {
     int rsc = RDB.getResourceID("memport");
-    Operations.push_back(
-        std::make_unique<MemOpConcrete>(
-            MemOpConcrete(op, ParentLoop, ParentBB, rsc, Results, Operands, type)));
-    
+    Operations.push_back(std::make_unique<MemOpConcrete>(
+        MemOpConcrete(op, ParentLoop, ParentBB, rsc, Results, Operands, type)));
+
     int width = 0;
     if (Results.size() > 0) {
       if (Results[0].getType().isIntOrFloat())
@@ -123,10 +120,10 @@ public:
       else
         width = 32;
     }
-    
+
     OpAbstract *newop = Operations.back().get();
     newop->setWidth(width);
-    
+
     auto newMemop = newop->getMemOp();
     for (unsigned i = 0; i < DepSigs.size(); ++i)
       newMemop->Dependences[DepSigs[i]] = DepDists[i];
@@ -139,18 +136,16 @@ public:
     D.SourceOp->addSucc(Dependencies.back().get());
     D.DestinationOp->addPred(Dependencies.back().get());
   }
-  
+
   /// build Dependency from containingOp;
-  void setClockFrequence(int Cycle) {
-    ClockPeriod = Cycle;
-  }
+  void setClockFrequence(int Cycle) { ClockPeriod = Cycle; }
 
   void printCDFG();
 
   void printSchedule();
 
   /**
-   * Query the scheduling information of a loop operation 
+   * Query the scheduling information of a loop operation
    * @param op reference to the loop operation
    * @return first: pipeline flag, second: achieved II
    */
@@ -167,7 +162,7 @@ public:
    */
   std::pair<int, int> queryOp(Operation *op) {
     if (op->getNumResults() == 0) {
-      if (OperationMap.find(op) == OperationMap.end()) 
+      if (OperationMap.find(op) == OperationMap.end())
         return std::make_pair(0, 0);
       OpAbstract *opA = OperationMap[op];
       int duration = std::max(1, RDB.getLatency(opA->getResource()));
@@ -187,39 +182,46 @@ public:
     }
     return std::make_pair(start, end);
   }
-private:
 
+private:
   /**
-   * @brief walk through a mlir block. 
+   * @brief walk through a mlir block.
    * @return (beginning BB, exiting BB)
    */
-  std::pair<BasicBlock*, BasicBlock*> buildCFG(Block &block, Loop *ParentLoop);
+  std::pair<BasicBlock *, BasicBlock *> buildCFG(Block &block,
+                                                 Loop *ParentLoop);
 
-  void buildDFG(); 
+  void buildDFG();
+
+  /**
+   * @brief Force a call op is executed after previous call op finished.
+   * This should function is temporary. Should not be used after simultaneous
+   * function call is supported
+   */
+  void forceCallOp();
+
 protected:
-
   /**
    * @brief convert OpAbstract to T
    */
-  template<typename T>
-  std::vector<std::unique_ptr<T>> initSchedule() {
-    
-    std::vector<std::unique_ptr<T>> vec;
-    llvm::DenseMap<const OpAbstract*, T*> OpMap;
+  template <typename T> std::vector<std::unique_ptr<T>> initSchedule() {
 
-    for (auto&& x : Operations) {
+    std::vector<std::unique_ptr<T>> vec;
+    llvm::DenseMap<const OpAbstract *, T *> OpMap;
+
+    for (auto &&x : Operations) {
       vec.push_back(std::make_unique<T>(x.get()));
 
       OpMap[x.get()] = vec.back().get();
     }
 
-    for (auto&& BB : BasicBlocks) {
-      for (auto& x : BB->getOperations())
+    for (auto &&BB : BasicBlocks) {
+      for (auto &x : BB->getOperations())
         x = OpMap[x];
       BB->setBranchOp(OpMap[BB->getBranchOp()]);
     }
 
-    for (auto&& D : Dependencies) {
+    for (auto &&D : Dependencies) {
       D->SourceOp = OpMap[D->SourceOp];
       D->DestinationOp = OpMap[D->DestinationOp];
     }
@@ -234,8 +236,8 @@ protected:
   }
 
 protected:
-
-  Operation *containingOp; /// This is the containing Op that needs to be scheduled. i.e. a moduleOp or a while loop Op
+  Operation *containingOp; /// This is the containing Op that needs to be
+                           /// scheduled. i.e. a moduleOp or a while loop Op
 
   float ClockPeriod;
 
@@ -243,22 +245,26 @@ protected:
 
   BasicBlock *EntryBB, *ExitBB;
 
-  std::vector<unique_ptr<Dependence>> Dependencies; /// This vector contains all the dependencies.
+  std::vector<unique_ptr<Dependence>>
+      Dependencies; /// This vector contains all the dependencies.
 
-  std::vector<unique_ptr<OpConcrete>> Operations; /// This vector contains all the operations that need to be scheduled.
+  std::vector<unique_ptr<OpConcrete>>
+      Operations; /// This vector contains all the operations that need to be
+                  /// scheduled.
 
   std::vector<unique_ptr<BasicBlock>> BasicBlocks;
 
   std::vector<unique_ptr<Loop>> Loops;
 
-  std::unordered_map<Operation*, OpAbstract*> OperationMap; // Map mlir operation to OpAbstract
+  std::unordered_map<Operation *, OpAbstract *>
+      OperationMap; // Map mlir operation to OpAbstract
 
-  llvm::DenseMap<Value, OpAbstract*> ValueMap; /// real Operation that needs to be scheduled
+  llvm::DenseMap<Value, OpAbstract *>
+      ValueMap; /// real Operation that needs to be scheduled
 
-  llvm::DenseMap<Operation*, Loop*> LoopMap;
+  llvm::DenseMap<Operation *, Loop *> LoopMap;
 };
 
 } // namespace scheduling
-
 
 #endif

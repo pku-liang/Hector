@@ -89,14 +89,10 @@ public:
     edge.push_back(std::vector<Edge>());
     redge.push_back(std::vector<Edge>());
   }
-  int addNode(int prev, std::string type, int length, int II = -1,
-              int tripcount = -1) {
+  int addNode() {
     edge.push_back(std::vector<Edge>());
     redge.push_back(std::vector<Edge>());
     numNode += 1;
-    edge[prev].push_back(Edge{type, prev, numNode - 1, length, tripcount, II});
-    redge[numNode - 1].push_back(
-        Edge{type, prev, numNode - 1, length, tripcount, II});
     return numNode - 1;
   }
   void addEdge(int from, int to, std::string type, int length, int II = -1,
@@ -251,11 +247,13 @@ int buildTimeGraphBlock(TimeGraph &tg, std::vector<mlir::Operation *> &vec,
   for (auto ts : timeStamp) {
     int node = -1;
 
-    if (last != -1)
-      node = tg.addNode(prev, "static", ts - last);
-    else
-      node = tg.addNode(prev, "static", 0);
-
+    if (last != -1) {
+      node = tg.addNode();
+      tg.addEdge(prev, node, "static", ts - last);
+    } else {
+      node = tg.addNode();
+      tg.addEdge(prev, node, "static", 0);
+    }
     ts2Node[ts] = node;
     prev = node;
     last = ts;
@@ -282,32 +280,38 @@ int buildTimeGraph(TimeGraph &tg, mlir::Block &block, int prev,
 
       currentNode = buildTimeGraphBlock(tg, vec, currentNode, scheduler);
 
+      int entryNode = tg.addNode();
+      tg.addEdge(currentNode, entryNode, "static", 0);
+
       if (!ifOp.getElseRegion().empty()) {
 
         int thenNode = buildTimeGraph(tg, ifOp.getThenRegion().front(),
-                                      currentNode, scheduler);
+                                      entryNode, scheduler);
         int elseNode = buildTimeGraph(tg, ifOp.getElseRegion().front(),
-                                      currentNode, scheduler);
-        int nxtNode = tg.addNode(thenNode, "static", 0);
+                                      entryNode, scheduler);
 
+        int nxtNode = tg.addNode();
+        tg.addEdge(thenNode, nxtNode, "static", 0);
         tg.addEdge(elseNode, nxtNode, "static", 0);
-        setIntvAttr(&op, std::make_pair(currentNode, nxtNode));
+
+        setIntvAttr(&op, std::make_pair(entryNode, nxtNode));
         currentNode = nxtNode;
       } else {
 
         int thenNode = buildTimeGraph(tg, ifOp.getThenRegion().front(),
-                                      currentNode, scheduler);
+                                      entryNode, scheduler);
         // int nxtNode = tg.addNode(thenNode, "static", 0);
         int nxtNode = thenNode;
 
-        setIntvAttr(&op, std::make_pair(currentNode, nxtNode));
+        setIntvAttr(&op, std::make_pair(entryNode, nxtNode));
         currentNode = nxtNode;
       }
 
     } else if (auto whileOp = llvm::dyn_cast<mlir::tor::WhileOp>(op)) {
 
       currentNode = buildTimeGraphBlock(tg, vec, currentNode, scheduler);
-      int beginNode = tg.addNode(currentNode, "static", 0);
+      int beginNode = tg.addNode();
+      tg.addEdge(currentNode, beginNode, "static", 0);
       int condNode =
           buildTimeGraph(tg, whileOp.getBefore().front(), beginNode, scheduler);
       int endNode = buildTimeGraph(tg, whileOp.getAfter().front(), condNode,
@@ -326,14 +330,17 @@ int buildTimeGraph(TimeGraph &tg, mlir::Block &block, int prev,
                              info.second));
       }
 
-      nxtNode = tg.addNode(beginNode, "static-while", 0, info.second);
+      nxtNode = tg.addNode();
+      tg.addEdge(beginNode, nxtNode, "static-while", 0, info.second);
 
       setIntvAttr(&op, std::make_pair(beginNode, endNode));
       currentNode = nxtNode;
     } else if (auto forOp = llvm::dyn_cast<mlir::tor::ForOp>(op)) {
 
       currentNode = buildTimeGraphBlock(tg, vec, currentNode, scheduler);
-      int beginNode = tg.addNode(currentNode, "static", 0);
+      int beginNode = tg.addNode();
+      tg.addEdge(currentNode, beginNode, "static", 0);
+
       int endNode = buildTimeGraph(tg, *forOp.getBody(), beginNode, scheduler);
       int nxtNode = 0;
 
@@ -349,7 +356,8 @@ int buildTimeGraph(TimeGraph &tg, mlir::Block &block, int prev,
                              info.second));
       }
 
-      nxtNode = tg.addNode(beginNode, "static-for", 0, info.second);
+      nxtNode = tg.addNode();
+      tg.addEdge(beginNode, nxtNode, "static-for", 0, info.second);
 
       setIntvAttr(&op, std::make_pair(beginNode, endNode));
       currentNode = nxtNode;
@@ -408,14 +416,18 @@ mlir::LogicalResult removeExtraEdges(mlir::tor::FuncOp funcOp, TimeGraph *tg) {
 mlir::LogicalResult scheduleOps(mlir::tor::FuncOp funcOp,
                                 mlir::PatternRewriter &rewriter) {
   using namespace scheduling;
+  auto name =
+      funcOp->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName()).str();
   if (auto strategy = funcOp->getAttrOfType<StringAttr>("strategy")) {
-    llvm::errs() << funcOp->getName() << " is dynamic. No static scheduling\n";
+    llvm::errs() << name << " is dynamic. No static scheduling\n";
     if (strategy.getValue().str() == "dynamic")
       return mlir::success();
   }
 
   std::unique_ptr<SDCSchedule> scheduler =
       std::make_unique<SDCSchedule>(SDCSchedule(funcOp.getOperation()));
+
+  llvm::outs() << "Scheduling function " << name << "\n";
 
   if (mlir::succeeded(scheduler->runSchedule()))
     llvm::errs() << "Schedule Succeeded\n";

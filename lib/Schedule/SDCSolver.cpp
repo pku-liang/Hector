@@ -1,6 +1,6 @@
 #include "Schedule/SDCSolver.h"
-#include <unordered_map>
 #include <queue>
+#include <unordered_map>
 
 namespace scheduling {
 
@@ -15,11 +15,12 @@ void SDCSolver::addInitialConstraint(Constraint C) {
   assert(C.x < NumVariable);
   assert(C.y < NumVariable);
 
-//  C.dump();
+  //  C.dump();
   if (C.type == Constraint::Constr_EQ) {
     Edges[0].insert(Edge(C.x, C.c));
     Edges[C.x].insert(Edge(0, -C.c));
-  } if (C.type == Constraint::Constr_CMP)
+  }
+  if (C.type == Constraint::Constr_CMP)
     Edges[C.y].insert(Edge(C.x, C.c));
 }
 
@@ -38,26 +39,26 @@ void SDCSolver::assignSolution(int x, int sol) {
 bool SDCSolver::initSolution() {
   Solution.resize(NumVariable, 0);
   int NumIteration = 0;
-  
+
   do {
     bool UpdateFlag = false;
 
-    for (int i = 0; i < NumVariable; ++i) 
-      for (auto &edge : Edges[i]) 
+    for (int i = 0; i < NumVariable; ++i)
+      for (auto &edge : Edges[i])
         if (Solution[edge.to] < Solution[i] + edge.length) {
           Solution[edge.to] = Solution[i] + edge.length;
           UpdateFlag = true;
         }
 
     if (UpdateFlag == false)
-    /// Converged. Must happens no late than the NumVariable-th iteration
+      /// Converged. Must happens no late than the NumVariable-th iteration
       break;
 
     NumIteration++;
   } while (NumIteration < NumVariable);
 
   if (NumIteration == NumVariable)
-    return ValidFlag =  false;
+    return ValidFlag = false;
   return ValidFlag = true;
 }
 
@@ -68,7 +69,7 @@ int SDCSolver::tryAddConstr(Constraint C) {
   std::unordered_map<int, int> dist_x;
   std::unordered_map<int, int> NewSolution;
 
-  auto cmp = [&] (int a, int b) {
+  auto cmp = [&](int a, int b) {
     return dist_x[a] != dist_x[b] ? dist_x[a] < dist_x[b] : a < b;
   };
 
@@ -84,7 +85,7 @@ int SDCSolver::tryAddConstr(Constraint C) {
 
   while (!Q.empty()) {
     int now = Q.top();
-    Q.pop();  
+    Q.pop();
 
     int NewSol = Solution[y] + c + (dist_x[now] + Solution[now] - Solution[x]);
     if (Solution[now] < NewSol) {
@@ -96,10 +97,10 @@ int SDCSolver::tryAddConstr(Constraint C) {
       } else {
         NewSolution[now] = NewSol;
 
-        for (auto &edge : Edges[now]) 
+        for (auto &edge : Edges[now])
           if (dist_x.find(edge.to) == dist_x.end()) {
-            dist_x[edge.to] = dist_x[now] + edge.length - 
-                              Solution[edge.to] + Solution[now]; /// ensure negative edge
+            dist_x[edge.to] = dist_x[now] + edge.length - Solution[edge.to] +
+                              Solution[now]; /// ensure negative edge
             Q.push(edge.to);
           }
       }
@@ -125,7 +126,7 @@ int SDCSolver::tryAddConstr(Constraint C) {
   if (flag)
     cnt += NumVariable - NewSolution.size();
 
-  return cnt; 
+  return cnt;
 }
 
 bool SDCSolver::addConstraint(Constraint C) {
@@ -141,26 +142,27 @@ bool SDCSolver::addConstraint(Constraint C) {
   std::unordered_map<int, int> dist_x;
   std::unordered_map<int, int> NewSolution;
 
-  auto cmp =
-    [&] (std::pair<int, int> a, std::pair<int, int> b) {
-      return a.second != b.second ? a.second < b.second : a.first < b.first;
-    };
-  
+  auto cmp = [&](std::pair<int, int> a, std::pair<int, int> b) {
+    return a.second != b.second ? a.second < b.second : a.first < b.first;
+  };
+
   bool valid = true;
 
   // Dijkstra Algorithm
-  std::priority_queue<std::pair<int, int>, std::vector<std::pair<int, int>>, decltype(cmp)> Q(cmp);
+  std::priority_queue<std::pair<int, int>, std::vector<std::pair<int, int>>,
+                      decltype(cmp)>
+      Q(cmp);
 
   dist_x[x] = 0;
   Q.push(std::make_pair(x, 0));
-  
+
   while (!Q.empty()) {
     int now = Q.top().first;
     dist_x[now] = Q.top().second;
-    Q.pop();  
+    Q.pop();
 
     int NewSol = Solution[y] + c + (dist_x[now] + Solution[now] - Solution[x]);
-    
+
     if (Solution[now] < NewSol) {
       // Solution[now] is affected
       if (now == y) {
@@ -171,11 +173,11 @@ bool SDCSolver::addConstraint(Constraint C) {
 
         NewSolution[now] = NewSol;
 
-        for (auto &edge : Edges[now]) 
+        for (auto &edge : Edges[now])
           if (dist_x.find(edge.to) == dist_x.end()) {
-            int nxt_dist = dist_x[now] + edge.length - 
-	      Solution[edge.to] + Solution[now]; // ensure negative edge
-	    
+            int nxt_dist = dist_x[now] + edge.length - Solution[edge.to] +
+                           Solution[now]; // ensure negative edge
+
             Q.push(std::make_pair(edge.to, nxt_dist));
           }
       }
@@ -191,7 +193,7 @@ bool SDCSolver::addConstraint(Constraint C) {
 
   if (Solution[0] > 0) {
     int tmp = Solution[0];
-    for (int i = 0; i < NumVariable; ++i) 
+    for (int i = 0; i < NumVariable; ++i)
       Solution[i] -= tmp;
   }
 
@@ -210,26 +212,22 @@ void SDCSolver::deleteConstraint(Constraint C) {
 
 int SDCSolver::verify() {
 
-  if (ValidFlag)
-    llvm::outs() << "Has feasible solution\n";
-  else {
-    llvm::outs() << "No feasible solution\n";
+  if (!ValidFlag)
     return 0;
-  }
 
   int flag = 1;
   for (int i = 0; i < NumVariable; ++i)
     for (auto &edge : Edges[i]) {
       if (Solution[edge.to] - Solution[i] < edge.length) {
-        llvm::outs() << "Require v" << edge.to << " - v" << i <<
-            " >= " << edge.length << ". ";
-        llvm::outs() << "While v" << edge.to << ": " << Solution[edge.to] << ", v" << 
-            i << ": " << Solution[i] << "\n";
+        llvm::outs() << "Require v" << edge.to << " - v" << i
+                     << " >= " << edge.length << ". ";
+        llvm::outs() << "While v" << edge.to << ": " << Solution[edge.to]
+                     << ", v" << i << ": " << Solution[i] << "\n";
 
         flag = -1;
       }
     }
-  
+
   return flag;
 }
 
@@ -263,9 +261,7 @@ void SDCSolver::printSolution() {
     llvm::outs() << i << ": " << Solution[i] << "\n";
 }
 
-bool SDCSolver::isValid() {
-  return ValidFlag;
-}
+bool SDCSolver::isValid() { return ValidFlag; }
 
 void SDCUnittest() {
   // SDC Solver unit test

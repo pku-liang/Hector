@@ -242,7 +242,6 @@ public:
       partitionIndices = storeOp.getIndices().drop_front(1);
     }
     Dependences.clear();
-    llvm::outs() << partitionIndices.size() << "\n";
   }
 
   bool isMemOpConcrete() {

@@ -331,16 +331,16 @@ std::pair<BasicBlock *, BasicBlock *> ScheduleBase::buildCFG(Block &block,
 }
 
 void ScheduleBase::forceCallOp() {
-  OpAbstract *lastCallOp = nullptr;
   for (auto &&BB : BasicBlocks) {
+    OpAbstract *lastCallOp = nullptr;
     for (auto op : llvm::reverse(BB->getOperations())) {
       if (op->getType() == OpAbstract::OpType::CALL_OP) {
         if (lastCallOp != nullptr) {
+          llvm::errs() << "Find callop pair\n";
+          lastCallOp->printName(llvm::errs());
+          op->printName(llvm::errs());
+          llvm::errs() << "OK\n";
           addDependency(Dependence(lastCallOp, op, 0, Dependence::D_RAW));
-          llvm::outs() << "Call Op precedence:\n";
-          lastCallOp->printName(llvm::outs());
-          op->printName(llvm::outs());
-          llvm::outs() << "\n";
         }
         lastCallOp = op;
       }

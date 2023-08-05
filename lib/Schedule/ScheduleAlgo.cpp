@@ -331,19 +331,27 @@ std::pair<BasicBlock *, BasicBlock *> ScheduleBase::buildCFG(Block &block,
 }
 
 void ScheduleBase::forceCallOp() {
+  // FIXME: Needs better resolving heuristics.
+  // Currently using callop as a divider of a basic block
   for (auto &&BB : BasicBlocks) {
-    OpAbstract *lastCallOp = nullptr;
+    std::vector<OpAbstract *> previousOps;
     for (auto op : llvm::reverse(BB->getOperations())) {
       if (op->getType() == OpAbstract::OpType::CALL_OP) {
-        if (lastCallOp != nullptr) {
-          llvm::errs() << "Find callop pair\n";
-          lastCallOp->printName(llvm::errs());
-          op->printName(llvm::errs());
-          llvm::errs() << "OK\n";
-          addDependency(Dependence(lastCallOp, op, 0, Dependence::D_RAW));
-        }
-        lastCallOp = op;
+        for (auto prev : previousOps)
+          addDependency(Dependence(prev, op, 0, Dependence::D_RAW));
+        previousOps.clear();
       }
+      previousOps.push_back(op);
+    }
+
+    std::vector<OpAbstract *> succOps;
+    for (auto op : BB->getOperations()) {
+      if (op->getType() == OpAbstract::OpType::CALL_OP) {
+        for (auto succ : succOps)
+          addDependency(Dependence(op, succ, 0, Dependence::D_RAW));
+        succOps.clear();
+      }
+      succOps.push_back(op);
     }
   }
 }

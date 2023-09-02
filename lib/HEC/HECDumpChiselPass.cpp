@@ -72,6 +72,11 @@ namespace mlir {
         //        string last_module() {
         //            return "mod" + std::to_string(module_count);
         //        }
+        
+        void set_name(Value val, std::string name) {
+            auto tmp = val.getImpl();
+            variable_names[tmp] = name;
+        }
 
         string get_name(Value val) {
             if (val.getDefiningOp()) {
@@ -853,12 +858,22 @@ namespace mlir {
 
         string dumpInstance(hec::InstanceOp &instance, hec::ComponentOp &comp) {
             bool wrapped = comp.interfc() == "wrapped";
+            bool sub_wrapped = false;
             string modName = get(instance.instanceName());
             string compName = get(instance.componentName());
             string chisel_instance = "\tval " + modName;
             chisel_instance += " = Module(new " + compName + ")\n";
             if (!wrapped) {
                 chisel_instance += "\t" + modName + ".go := 0.U\n";
+            }
+            // FIXME: dummy representation
+            if (wrapped) {
+                auto hecDesign = cast<hec::DesignOp>(comp->getParentOp());
+                hecDesign.walk([&](hec::ComponentOp op) {
+                    if (op.getName() == compName) {
+                        sub_wrapped = op.interfc() == "wrapped";
+                        }
+                });
             }
             for (unsigned idx = 0; idx < instance.getNumResults(); ++idx) {
                 if (portNames[compName][idx] == "go") {
@@ -867,14 +882,19 @@ namespace mlir {
                 if (wrapped && portNames[compName][idx] == "done") {
                     continue;
                 }
-                chisel_instance += "\tval " + get_name(instance.getResult(idx)) + " = ";
-                if (!wrapped) {
-                    chisel_instance += modName + "." + portNames[compName][idx] + "\n";
+                if (!wrapped || sub_wrapped) {
+                    set_name(instance.getResult(idx), modName + "." + portNames[compName][idx]);
                 } else {
+                    chisel_instance += "\tval " + get_name(instance.getResult(idx)) + " = ";
                     chisel_instance += modName + ".d_" + portNames[compName][idx] + "\n";
                 }
-                if (idx < static_cast<unsigned int>(numInPorts[compName])) {
-                    chisel_instance += "\t" + get_name(instance.getResult(idx)) + " := DontCare\n";
+		if (!(wrapped && sub_wrapped)) {
+                    if (wrapped || idx < static_cast<unsigned int>(numInPorts[compName])) {
+                        chisel_instance += "\t" + get_name(instance.getResult(idx)) + " := DontCare\n";
+                    }
+		}
+                if (wrapped && idx >= static_cast<unsigned int>(numInPorts[compName])) {
+                    chisel_instance += "\t" + get_name(instance.getResult(idx)) + ".ready := true.B\n";
                 }
             }
             if (!wrapped) {
@@ -1137,6 +1157,17 @@ namespace mlir {
             }
             chisel_component += "}\n";
             return chisel_component;
+        }
+        
+        void dummyComponent(hec::ComponentOp &comp) {
+            string compName = get(comp.getName());
+            portNames[compName] = std::vector<string>();
+            numInPorts[compName] = comp.numInPorts();
+            auto ports = hec::getComponentPortInfo(&*comp);
+            for (auto val : comp.getArguments()) {
+                set_name(val, get(ports[val.getArgNumber()].name.getValue()));
+                portNames[compName].push_back(get(ports[val.getArgNumber()].name.getValue()));
+            }
         }
 
         string dumpHandShakeComponent(hec::ComponentOp &comp) {
@@ -1777,6 +1808,8 @@ namespace mlir {
                                 } else {
                                     chisel_code += DUMP::dumpPipelineForComponent(comp);
                                 }
+                            } else if (comp.style() == "dummy") {
+                                DUMP::dummyComponent(comp);
                             }
                         } else if (auto primitive = dyn_cast<hec::PrimitiveOp>(func)) {
                             std::string primName = DUMP::get(primitive.primitiveName());

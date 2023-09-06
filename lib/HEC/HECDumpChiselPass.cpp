@@ -888,13 +888,15 @@ namespace mlir {
                     chisel_instance += "\tval " + get_name(instance.getResult(idx)) + " = ";
                     chisel_instance += modName + ".d_" + portNames[compName][idx] + "\n";
                 }
-		if (!(wrapped && sub_wrapped)) {
+                if (!(wrapped && sub_wrapped)) {
                     if (wrapped || idx < static_cast<unsigned int>(numInPorts[compName])) {
                         chisel_instance += "\t" + get_name(instance.getResult(idx)) + " := DontCare\n";
                     }
-		}
+                }
                 if (wrapped && idx >= static_cast<unsigned int>(numInPorts[compName])) {
-                    chisel_instance += "\t" + get_name(instance.getResult(idx)) + ".ready := true.B\n";
+                    if (instance.getResult(idx).use_empty()) {
+                        chisel_instance += "\t" + get_name(instance.getResult(idx)) + ".ready := true.B\n";
+                    }
                 }
             }
             if (!wrapped) {
@@ -1171,11 +1173,11 @@ namespace mlir {
         }
 
         string dumpHandShakeComponent(hec::ComponentOp &comp) {
-//            string chisel_component = "class ";
-            string chisel_component = "";
+            string chisel_component = "class ";
+//            string chisel_component = "";
             string compName = get(comp.getName());
 //            auto hecDesign = cast<hec::DesignOp>(comp->getParentOp());
-//            chisel_component += DUMP::get(hecDesign.symbol()) + " extends MultiIOModule {\n";
+            chisel_component += compName + " extends MultiIOModule {\n";
             portNames[compName] = std::vector<string>();
 //            chisel_component += "\tval go = IO(Input(Bool()))\n";
 //            chisel_component += "\tval done = IO(Output(Bool()))\n\tdone := 0.U\n";
@@ -1799,7 +1801,7 @@ namespace mlir {
                             if (comp.style() == "STG") {
                                 chisel_code += DUMP::dumpSTGComponent(comp);
                             } else if (comp.style() == "handshake") {
-                                assert(!found_dynamic);
+                                //assert(!found_dynamic);
                                 found_dynamic = true;
                                 chisel_code += DUMP::dumpHandShakeComponent(comp);
                             } else if (comp.style() == "pipeline") {
@@ -1945,7 +1947,23 @@ namespace mlir {
                 }
             } else {
                 chisel_code = "class " + DUMP::get(hecDesign.symbol()) + " extends MultiIOModule {\n" + chisel_code;
-                chisel_code = chisel_code.substr(0, chisel_code.rfind("}"));
+		chisel_code += "\tval main = Module(new main)\n";
+                m.walk([&](hec::ComponentOp op) {
+                    if (op.getName() != "main") return;
+                    auto &ports = DUMP::portNames["main"];
+                    for (unsigned idx = 0; idx != op.getNumArguments(); ++idx) {
+                        if (idx < op.numInPorts()) {
+                            chisel_code += "\tval " + ports[idx] + " = IO(Flipped(DecoupledIO(" +
+                                           DUMP::getType(op.getArgument(idx).getType()) + ")))\n";
+                            chisel_code += "\tmain." + ports[idx] + " <> " + ports[idx] + "\n";
+                        } else {
+                            chisel_code += "\tval " + ports[idx] + " = IO(DecoupledIO(" +
+                                           DUMP::getType(op.getArgument(idx).getType()) + "))\n";
+                            chisel_code += "\t" + ports[idx] + " <> main." + ports[idx] + "\n";
+                        }
+                    }
+                });
+
                 chisel_code += "\tval finish = IO(Input(Bool()))\n";
                 for (auto &component : *(hecDesign.getBody())) {
                     if (auto hecComponent = dyn_cast<hec::ComponentOp>(component)) {

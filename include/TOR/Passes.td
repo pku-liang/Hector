@@ -33,6 +33,18 @@ def SCFToTOR : Pass<"scf-to-tor", "mlir::tor::DesignOp"> {
   let dependentDialects = ["mlir::tor::TORDialect"];
 }
 
+def SCFDump : Pass<"dump-scf", "mlir::tor::DesignOp"> {
+  let summary = "Dump SCF information";
+  let constructor = "mlir::createSCFDumpPass()";
+  let dependentDialects = ["mlir::tor::TORDialect"];
+}
+
+def TORDump : Pass<"dump-tor", "mlir::tor::DesignOp"> {
+  let summary = "Dump TOR information";
+  let constructor = "mlir::createTORDumpPass()";
+  let dependentDialects = ["mlir::tor::TORDialect"];
+}
+
 def WidthAnalysis : Pass<"width-analysis", "mlir::tor::DesignOp"> {
   let summary = "bitwidth analysis and reduction";
   let constructor = "mlir::createWidthAnalysisPass()";

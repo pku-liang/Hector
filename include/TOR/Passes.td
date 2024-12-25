@@ -32,6 +32,9 @@ def SCFToTOR : Pass<"scf-to-tor", "mlir::tor::DesignOp"> {
   let summary = "Convert SCF to unscheduled TOR";
   let constructor = "mlir::createSCFToTORPass()";
   let dependentDialects = ["mlir::tor::TORDialect"];
+  let options = [
+    Option<"pipeline", "pipeline", "bool", "false", "Attach pipeline attribute to inner pipeline">,
+  ];
 }
 
 def ConvertInput : Pass<"convert-input", "mlir::ModuleOp"> {
@@ -42,6 +45,7 @@ def ConvertInput : Pass<"convert-input", "mlir::ModuleOp"> {
     Option<"top_function", "top-function", "std::string", "\"main\"", "The top function name">,
     Option<"clock", "clock", "double", "6.0", "Clock cycle">,
     Option<"resource", "resource", "std::string", "\"./resource_dynamatic.json\"", "Resource file">,
+    Option<"output_path", "output-path", "std::string", "\"output_path\"", "output path">,
   ];
 }
 

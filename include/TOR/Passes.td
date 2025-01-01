@@ -64,12 +64,18 @@ def SCFDump : Pass<"dump-scf", "mlir::tor::DesignOp"> {
   let summary = "Dump SCF information";
   let constructor = "mlir::createSCFDumpPass()";
   let dependentDialects = ["mlir::tor::TORDialect"];
+  let options = [
+    Option<"json", "json", "std::string", "", "SCF json output file">
+  ];
 }
 
 def TORDump : Pass<"dump-tor", "mlir::tor::DesignOp"> {
   let summary = "Dump TOR information";
   let constructor = "mlir::createTORDumpPass()";
   let dependentDialects = ["mlir::tor::TORDialect"];
+  let options = [
+    Option<"json", "json", "std::string", "", "TOR json output file">
+  ];
 }
 
 // def WidthAnalysis : Pass<"width-analysis", "mlir::tor::DesignOp"> {

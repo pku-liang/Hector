@@ -84,16 +84,12 @@ def GotoOp : HECOp<"goto", [
 
   let arguments = (ins
     FlatSymbolRefAttr : $dest,
-    // I1Attr : $hasCond,
-    Optional<I1> : $cond
+    Optional<I1> : $guard
   );
 
   let assemblyFormat = [{
-    $dest (` ` `if` $cond^)? attr-dict
+    $dest (` ` `if` $guard^)? attr-dict
   }];
-
-  let hasCanonicalizeMethod = 1;
-  //let verfier = "return ::verify$cppClass(*this);";
 }
 
 def CDoneOp : HECOp<"cdone", [
@@ -107,11 +103,11 @@ def CDoneOp : HECOp<"cdone", [
   }];
 
   let arguments = (ins
-    I1 : $cond,
+    I1 : $guard,
     Variadic<AnyType> : $results
   );
 
-  let assemblyFormat = "attr-dict $cond `?` ($results^ `:` type($results))?";
+  let assemblyFormat = "attr-dict $guard `?` ($results^ `:` type($results))?";
   //let verfier = "return ::verify$cppClass(*this);";
 }
 

@@ -58,6 +58,27 @@ def SubIOp : HECOp<"subi", [Pure]> {
   
 }
 
+def MulIConstOp : HECOp<"muli_const", [Pure]> {
+  let summary = "HEC muli_const";
+  let description = [{
+    The "hec.muli_const" operation represents the mulplication of two variables.
+    One of them must be a constant.
+  }];
+  let arguments = (ins
+    AnyType : $lhs,
+    AnyType : $rhs,
+    Optional<I1> : $guard);
+
+  let results = (outs
+    AnyType : $res
+  );
+
+  let assemblyFormat= [{
+    $lhs $rhs (` ` `if` $guard^)? attr-dict `:`
+    `(` type($lhs) `,` type($rhs) `)` `->` type($res)
+  }];
+}
+
 def CmpIOp : HECOp<"cmpi", [Pure]> {
   let summary = "HEC cmpi";
   let description = [{
@@ -138,7 +159,7 @@ def XOrOp : HECOp<"xor", [Pure, SameOperandsAndResultType]> {
   }];
 }
 
-def ShiftLeftOp : HECOp<"shift_left", [Pure, SameOperandsAndResultType]> {
+def ShiftLeftOp : HECOp<"shift_left", [Pure]> {
   let summary = "HEC Shift_left";
   let description = [{
     The "hec.shift_left" operation represents a logical and
@@ -153,14 +174,15 @@ def ShiftLeftOp : HECOp<"shift_left", [Pure, SameOperandsAndResultType]> {
   );
 
   let assemblyFormat = [{
-    $lhs $rhs (` ` `if` $guard^)? attr-dict `:` type($lhs)
+    $lhs $rhs (` ` `if` $guard^)? attr-dict `:` 
+    `(` type($lhs) `,` type($rhs) `)` `->` type($res)
   }];
 }
 
-def SignedShiftRightOp : HECOp<"shift_right_signed", [Pure, SameOperandsAndResultType]> {
-  let summary = "HEC Shift_right_signed";
+def SignedShiftRightOp : HECOp<"shrsi", [Pure]> {
+  let summary = "HEC shrsi";
   let description = [{
-    The "hec.shift_right_signed" operation represents a logical and
+    The "hec.shrsi" operation represents a logical and
   }];
   let arguments = (ins
     AnyType : $lhs,
@@ -172,17 +194,38 @@ def SignedShiftRightOp : HECOp<"shift_right_signed", [Pure, SameOperandsAndResul
   );
 
   let assemblyFormat = [{
-    $lhs $rhs (` ` `if` $guard^)? attr-dict `:` type($lhs)
+    $lhs $rhs (` ` `if` $guard^)? attr-dict `:` 
+    `(` type($lhs) `,` type($rhs) `)` `->` type($res)
+  }];
+}
+
+def UnSignedShiftRightOp : HECOp<"shrui", [Pure]> {
+  let summary = "HEC shrui";
+  let description = [{
+    The "hec.shrui" operation represents a logical and
+  }];
+  let arguments = (ins
+    AnyType : $lhs,
+    AnyType : $rhs,
+    Optional<I1> : $guard
+  );
+  let results = (outs
+    AnyType : $res
+  );
+
+  let assemblyFormat = [{
+    $lhs $rhs (` ` `if` $guard^)? attr-dict `:` 
+    `(` type($lhs) `,` type($rhs) `)` `->` type($res)
   }];
 }
 
 def TruncateIOp : HECOp<"trunci", [Pure]> {
-  let summary = "HEC Shift_right_signed";
+  let summary = "HEC trunci";
   let description = [{
     The "hec.trunci" operation represents a logical and
   }];
   let arguments = (ins
-    AnyType : $lhs,
+    AnyType : $src,
     Optional<I1> : $guard
   );
   let results = (outs
@@ -190,17 +233,17 @@ def TruncateIOp : HECOp<"trunci", [Pure]> {
   );
 
   let assemblyFormat = [{
-    $lhs (` ` `if` $guard^)? attr-dict `:` type($lhs) `to` type($res)
+    $src (` ` `if` $guard^)? attr-dict `:` type($src) `to` type($res)
   }];
 }
 
-def SignExtendIOp: HECOp<"sexti", [Pure]> {
-  let summary = "HEC sexti";
+def SignExtendIOp: HECOp<"extsi", [Pure]> {
+  let summary = "HEC extsi";
   let description = [{
-    The "hec.sexti"
+    The "hec.extsi"
   }];
   let arguments = (ins
-    AnyType : $lhs,
+    AnyType : $src,
     Optional<I1> : $guard
   );
   let results = (outs
@@ -208,7 +251,25 @@ def SignExtendIOp: HECOp<"sexti", [Pure]> {
   );
 
   let assemblyFormat = [{
-    $lhs (` ` `if` $guard^)? attr-dict `:` type($lhs) `to` type($res)
+    $src (` ` `if` $guard^)? attr-dict `:` type($src) `to` type($res)
+  }];
+}
+
+def ZeroExtendIOp: HECOp<"extui", [Pure]> {
+  let summary = "HEC extui";
+  let description = [{
+    The "hec.extui"
+  }];
+  let arguments = (ins
+    AnyType : $src,
+    Optional<I1> : $guard
+  );
+  let results = (outs
+    AnyType : $res
+  );
+
+  let assemblyFormat = [{
+    $src (` ` `if` $guard^)? attr-dict `:` type($src) `to` type($res)
   }];
 }
 
@@ -218,7 +279,7 @@ def NegFOp: HECOp<"negf", [Pure]> {
     The "hec.negf"
   }];
   let arguments = (ins
-    AnyType : $lhs,
+    AnyType : $src,
     Optional<I1> : $guard
   );
   let results = (outs
@@ -226,17 +287,17 @@ def NegFOp: HECOp<"negf", [Pure]> {
   );
 
   let assemblyFormat = [{
-    $lhs (` ` `if` $guard^)? attr-dict `:` type($lhs) `to` type($res)
+    $src (` ` `if` $guard^)? attr-dict `:` type($src) `to` type($res)
   }];
 }
 
-def SitofpOp : HECOp<"sitofp", [Pure]> {
-  let summary = "HEC sitofp";
-  let description = [{
-    The "hec.fptosi"
+def AbsFOp: HECOp<"absf", [Pure]> {
+  let summary = "HEC absf";
+  let description = [{ 
+    The "hec.absf"
   }];
   let arguments = (ins
-    AnyType : $lhs,
+    AnyType : $src,
     Optional<I1> : $guard
   );
   let results = (outs
@@ -244,17 +305,17 @@ def SitofpOp : HECOp<"sitofp", [Pure]> {
   );
 
   let assemblyFormat = [{
-    $lhs (` ` `if` $guard^)? attr-dict `:` type($lhs) `to` type($res)
+    $src (` ` `if` $guard^)? attr-dict `:` type($src) `to` type($res)
   }];
 }
 
-def FptosiOp: HECOp<"fptosi", [Pure]> {
-  let summary = "HEC fptosi";
-  let description = [{
-    The "hec.fptosi"
+def AbsIOp: HECOp<"absi", [Pure]> {
+  let summary = "HEC absi";
+  let description = [{ 
+    The "hec.absi"
   }];
   let arguments = (ins
-    AnyType : $lhs,
+    AnyType : $src,
     Optional<I1> : $guard
   );
   let results = (outs
@@ -262,10 +323,10 @@ def FptosiOp: HECOp<"fptosi", [Pure]> {
   );
 
   let assemblyFormat = [{
-    $lhs (` ` `if` $guard^)? attr-dict `:` type($lhs) `to` type($res)
+     $src (` ` `if` $guard^)? attr-dict `:` type($src) `to` type($res)
   }];
 }
-
+ 
 def SelectOp: HECOp<"select", [Pure, AllTypesMatch<["lhs", "rhs", "res"]>]> {
   let summary = "HEC select";
   let description = [{
@@ -283,20 +344,5 @@ def SelectOp: HECOp<"select", [Pure, AllTypesMatch<["lhs", "rhs", "res"]>]> {
 
   let assemblyFormat = [{
     $cond $lhs $rhs (` ` `if` $guard^)? attr-dict `:` type($lhs)
-  }];
-}
-
-def ActivateOp: HECOp<"activate", [Pure, AllTypesMatch<["lhs", "rhs"]>]> {
-  let summary = "HEC activate";
-  let description = [{
-
-  }];
-  let arguments = (ins
-    AnyType: $lhs,
-    AnyType: $rhs,
-    AnyType: $cond
-  );
-  let assemblyFormat = [{
-    $lhs `=` $rhs `by` $cond attr-dict `:` type($lhs) `,` type($cond)
   }];
 }

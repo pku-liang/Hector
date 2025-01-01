@@ -224,11 +224,11 @@ def EnableOp : HECOp<"enable", []> {
   }];
   let arguments = (ins
     AnyType : $port,
-    Optional<I1> : $cond
+    Optional<I1> : $guard
   );
 
   let assemblyFormat = [{
-    $port (` ` `if` $cond^)? attr-dict `:` type($port)
+    $port (` ` `if` $guard^)? attr-dict `:` type($port)
   }];
 }
 
@@ -241,11 +241,11 @@ def GoOp : HECOp<"go", []> {
 
   let arguments = (ins
     StrAttr : $name, 
-    Optional<I1> : $cond
+    Optional<I1> : $guard
   );
   
   let assemblyFormat = [{
-    $name (` ` `if` $cond^)? attr-dict
+    $name (` ` `if` $guard^)? attr-dict
   }];
 }
 #endif // HEC_STRUCTURE_TD

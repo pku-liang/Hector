@@ -395,14 +395,14 @@ namespace mlir {
             } else if (auto truncIOp = dyn_cast<hec::TruncateIOp>(op)) {
                 if (truncIOp.getGuard() == Value()) {
                     chisel_code += tab + "val " + get_name(truncIOp.getRes());
-                    chisel_code += " = " + get_name(truncIOp.getLhs()) + "\n";
+                    chisel_code += " = " + get_name(truncIOp.getSrc()) + "\n";
                 } else {
                     chisel_code += tab + "val " + get_name(truncIOp.getRes());
                     chisel_code += " = Wire(" + getType(truncIOp.getRes().getType()) + ")\n";
                     chisel_code += tab + get_name(truncIOp.getRes()) + " := DontCare\n";
                     chisel_code += tab + "when (" + get_bool_name(truncIOp.getGuard()) + ") {\n";
                     chisel_code += tab + "\t" + get_name(truncIOp.getRes());
-                    chisel_code += " := " + get_name(truncIOp.getLhs()) + "\n";
+                    chisel_code += " := " + get_name(truncIOp.getSrc()) + "\n";
                     chisel_code += tab + "}\n";
                 }
             } else if (auto negFOp = dyn_cast<hec::NegFOp>(op)) {
@@ -410,9 +410,9 @@ namespace mlir {
                 if (negFOp.getGuard() == Value()) {
                     chisel_code += tab + "val " + get_name(negFOp.getRes());
                     if (type.isa<Float32Type>()) {
-                        chisel_code += " = NegF(8, 24, " + get_name(negFOp.getLhs()) + ")\n";
+                        chisel_code += " = NegF(8, 24, " + get_name(negFOp.getSrc()) + ")\n";
                     } else {
-                        chisel_code += " = NegF(11, 53, " + get_name(negFOp.getLhs()) + ")\n";
+                        chisel_code += " = NegF(11, 53, " + get_name(negFOp.getSrc()) + ")\n";
                     }
                 } else {
                     chisel_code += tab + "val " + get_name(negFOp.getRes());
@@ -421,9 +421,9 @@ namespace mlir {
                     chisel_code += tab + "when (" + get_bool_name(negFOp.getGuard()) + ") {\n";
                     chisel_code += tab + "\t" + get_name(negFOp.getRes());
                     if (type.isa<Float32Type>()) {
-                        chisel_code += " := NegF(8, 24, " + get_name(negFOp.getLhs()) + ")\n";
+                        chisel_code += " := NegF(8, 24, " + get_name(negFOp.getSrc()) + ")\n";
                     } else {
-                        chisel_code += " := NegF(11, 53, " + get_name(negFOp.getLhs()) + ")\n";
+                        chisel_code += " := NegF(11, 53, " + get_name(negFOp.getSrc()) + ")\n";
                     }
                     chisel_code += tab + "}\n";
                 }
@@ -431,14 +431,14 @@ namespace mlir {
                 //FIXME: Deal with sexti operation
                 if (sextIOp.getGuard() == Value()) {
                     chisel_code += tab + "val " + get_name(sextIOp.getRes());
-                    chisel_code += " = " + get_name(sextIOp.getLhs()) + "\n";
+                    chisel_code += " = " + get_name(sextIOp.getSrc()) + "\n";
                 } else {
                     chisel_code += tab + "val " + get_name(sextIOp.getRes());
                     chisel_code += " = Wire(" + getType(sextIOp.getRes().getType()) + ")\n";
                     chisel_code += tab + get_name(sextIOp.getRes()) + " := DontCare\n";
                     chisel_code += tab + "when (" + get_bool_name(sextIOp.getGuard()) + ") {\n";
                     chisel_code += tab + "\t" + get_name(sextIOp.getRes());
-                    chisel_code += " := " + get_name(sextIOp.getLhs()) + "\n";
+                    chisel_code += " := " + get_name(sextIOp.getSrc()) + "\n";
                     chisel_code += tab + "}\n";
                 }
             } else {
@@ -495,10 +495,10 @@ namespace mlir {
                         if (auto transition = dyn_cast<hec::TransitionOp>(op)) {
                             for (auto &sop : transition.getBody().front()) {
                                 if (auto branch = dyn_cast<hec::GotoOp>(sop)) {
-                                    if (branch.getCond() == Value()) {
+                                    if (branch.getGuard() == Value()) {
                                         chisel_state += tab + "state := State." + get(branch.getDest()) + ";\n";
                                     } else {
-                                        chisel_state += tab + "when (" + get_bool_name(branch.getCond());
+                                        chisel_state += tab + "when (" + get_bool_name(branch.getGuard());
                                         chisel_state +=
                                                 ") {\n\t" + tab + "state := State." + get(branch.getDest()) + ";\n" + tab +
                                                 "}\n";
@@ -516,7 +516,7 @@ namespace mlir {
                                     }
                                 }
                                 if (auto done = dyn_cast<hec::CDoneOp>(sop)) {
-                                    chisel_state += tab + "when (" + get_bool_name(done.getCond()) + ") {\n";
+                                    chisel_state += tab + "when (" + get_bool_name(done.getGuard()) + ") {\n";
                                     if (wrapped) {
                                         chisel_state += tab + "\tdone()\n";
                                     } else {
@@ -531,10 +531,10 @@ namespace mlir {
                                 }
                             }
                         } else if (auto goOp = dyn_cast<hec::GoOp>(op)) {
-                            if (goOp.getCond() == Value()) {
+                            if (goOp.getGuard() == Value()) {
                                 chisel_state += tab + get(goOp.getName()) + ".go := 1.U\n";
                             } else {
-                                chisel_state += tab + "when (" + get_bool_name(goOp.getCond()) + ") {\n";
+                                chisel_state += tab + "when (" + get_bool_name(goOp.getGuard()) + ") {\n";
                                 chisel_state += tab + "\t" + get(goOp.getName()) + ".go := 1.U\n" + tab + "}\n";
                             }
                         } else if (auto assign = dyn_cast<hec::AssignOp>(op)) {
@@ -547,10 +547,10 @@ namespace mlir {
                                 chisel_state += tab + "}\n";
                             }
                         } else if (auto enableOp = dyn_cast<hec::EnableOp>(op)) {
-                            if (enableOp.getCond() == Value()) {
+                            if (enableOp.getGuard() == Value()) {
                                 chisel_state += tab + get_name(enableOp.getPort()) + " := true.B\n";
                             } else {
-                                chisel_state += tab + "when (" + get_bool_name(enableOp.getCond()) + ") {\n";
+                                chisel_state += tab + "when (" + get_bool_name(enableOp.getGuard()) + ") {\n";
                                 chisel_state += tab + "\t" + get_name(enableOp.getPort()) + " := 1.U\n";
                                 chisel_state += tab + "}\n";
                             }
@@ -660,14 +660,14 @@ namespace mlir {
                         chisel_stage += " := " + get_name(yieldOp.getOperand(idx)) + "\n";
                     }
                 } else if (auto enableOp = dyn_cast<hec::EnableOp>(op)) {
-                    if (enableOp.getCond() == Value()) {
+                    if (enableOp.getGuard() == Value()) {
                         chisel_stage += tab + "when (valid(" + std::to_string(stage) + ")) {\n";
                         chisel_stage += tab + "\t" + get_name(enableOp.getPort()) + " := 1.U\n";
                         chisel_stage += tab + "}\n";
                     } else {
                         chisel_stage +=
                                 tab + "when (valid(" + std::to_string(stage) + ") && " +
-                                get_bool_name(enableOp.getCond()) +
+                                get_bool_name(enableOp.getGuard()) +
                                 ") {\n";
                         chisel_stage += tab + "\t" + get_name(enableOp.getPort()) + " := 1.U\n";
                         chisel_stage += tab + "}\n";

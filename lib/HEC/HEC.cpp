@@ -894,21 +894,21 @@ OpFoldResult NotOp::fold(ArrayRef<Attribute> operands) {
     return BoolAttr::get(getContext(), !(lhs.getValue()));
 }
 
-LogicalResult GotoOp::canonicalize(GotoOp op, PatternRewriter &rewriter) {
-    auto guard = op.getCond();
-    if (guard) {
-        if (auto constant = dyn_cast<arith::ConstantIntOp>(guard.getDefiningOp())) {
-            if (!constant.value()) {
-                rewriter.eraseOp(op);
-                return success();
-            } else {
-                op.getCondMutable().assign(Value());
-                return success();
-            }
-        }
-    }
-    return failure();
-}
+// LogicalResult GotoOp::canonicalize(GotoOp op, PatternRewriter &rewriter) {
+//     auto guard = op.getGuard();
+//     if (guard) {
+//         if (auto constant = dyn_cast<arith::ConstantIntOp>(guard.getDefiningOp())) {
+//             if (!constant.value()) {
+//                 rewriter.eraseOp(op);
+//                 return success();
+//             } else {
+//                 op.getCondMutable().assign(Value());
+//                 return success();
+//             }
+//         }
+//     }
+//     return failure();
+// }
 
 LogicalResult AssignOp::canonicalize(AssignOp op, PatternRewriter &rewriter) {
     auto guard = op.getGuard();
@@ -988,7 +988,7 @@ LogicalResult StateSetOp::canonicalize(StateSetOp op, PatternRewriter &rewriter)
                         if (goto_num > 1) continue;
                         for (auto &sub_op : trans.getBody().front()) {
                             if (auto goto_op = dyn_cast<GotoOp>(sub_op)) {
-                                if (goto_op.getCond()) continue;
+                                if (goto_op.getGuard()) continue;
                                 if (goto_op.getDest() == name) {
                                     rewriter.setInsertionPoint(trans);
                                     for (auto &body_op : state.getBody().front()) {

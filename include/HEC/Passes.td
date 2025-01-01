@@ -25,6 +25,9 @@ def HECDump : Pass<"dump-hec", "mlir::ModuleOp"> {
   let summary = "Dump HEC information";
   let constructor = "mlir::createHECDumpPass()";
   let dependentDialects = [];
+  let options = [
+    Option<"json", "json", "std::string", "", "HEC json output file">
+  ];
 }
 
 #endif // HEC_PASSES

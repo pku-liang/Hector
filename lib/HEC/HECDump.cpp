@@ -148,7 +148,7 @@ namespace {
                 j["op_type"] = string("cmp_") + cmpIOp.getPred().str();
                 j["name"] = get_dump(cmpIOp);
                 j["type"] = get_type(cmpIOp.getResult().getType());
-                for (const auto &operand : cmpIOp->getOperands()) {
+                for (const auto &operand: cmpIOp->getOperands()) {
                     j["operands"].push_back(get_value(operand));
                 }
                 if (cmpIOp.getGuard()) {
@@ -168,17 +168,39 @@ namespace {
                 json j;
                 j["op_type"] = "enable";
                 j["port"] = get_value(enable.getPort());
+                j["stream"] = cast<hec::PrimitiveOp>(enable.getPort().getDefiningOp()).getPrimitiveName() == "fifo";
+                if (enable.getGuard()) {
+                    j["condition"] = get_value(enable.getGuard());
+                }
+                return j;
+            } else if (auto yield = dyn_cast<hec::YieldOp>(op)) {
+                json j;
+                j["op_type"] = "yield";
+                for (const auto &operand: yield->getOperands()) {
+                    j["operands"].push_back(get_value(operand));
+                }
                 return j;
             } else {
                 OPERATION(hec::ShiftLeftOp, "shift_left")
                 OPERATION(hec::AddIOp, "add")
+                OPERATION(hec::MulIConstOp, "muli_const")
                 OPERATION(hec::SubIOp, "sub")
                 OPERATION(hec::NotOp, "not")
-                OPERATION(hec::TruncateIOp, "trunc")
+                OPERATION(hec::TruncateIOp, "trunci")
                 OPERATION(hec::SelectOp, "select")
                 OPERATION(hec::AndOp, "and")
                 OPERATION(hec::OrOp, "or")
                 OPERATION(hec::XOrOp, "xor")
+                OPERATION(hec::NegFOp, "negf")
+                OPERATION(hec::SignExtendIOp, "extsi")
+                OPERATION(hec::ZeroExtendIOp, "extui")
+                OPERATION(hec::ShiftLeftOp, "shli")
+                OPERATION(hec::SignedShiftRightOp, "shrsi")
+                OPERATION(hec::UnSignedShiftRightOp, "shrui")
+                OPERATION(hec::OrOp, "or")
+                OPERATION(hec::AbsFOp, "absf")
+                OPERATION(hec::AbsIOp, "absi")
+
                 op->dump();
                 assert(false);
                 return j;
@@ -191,16 +213,16 @@ namespace {
             json j;
             j["state"] = state.getName();
             j["ops"] = json::array();
-            for (auto &op : state.getBody().front()) {
+            for (auto &op: state.getBody().front()) {
                 if (auto transition = dyn_cast<hec::TransitionOp>(op)) {
                     json sj;
                     sj["jump"] = json::array();
-                    for (auto &sop : transition.getBody().front()) {
+                    for (auto &sop: transition.getBody().front()) {
                         if (auto jump = dyn_cast<hec::GotoOp>(sop)) {
-                            if (jump.getCond()) {
+                            if (jump.getGuard()) {
                                 json ssj;
                                 ssj["dest"] = jump.getDest();
-                                ssj["cond"] = get_value(jump.getCond());
+                                ssj["cond"] = get_value(jump.getGuard());
                                 sj["jump"].push_back(ssj);
                             } else {
                                 sj["default"] = jump.getDest();
@@ -208,7 +230,7 @@ namespace {
                         } else if (auto done = dyn_cast<hec::DoneOp>(sop)) {
                             sj["done"] = json::array();
                             sj.erase("jump");
-                            for (auto val : done->getOperands()) {
+                            for (auto val: done->getOperands()) {
                                 sj["done"].push_back(get_value(val));
                             }
                         }
@@ -232,16 +254,16 @@ namespace {
             json j;
             j["stage"] = stage.getName();
             j["ops"] = json::array();
-            for (auto &op : stage.getBody().front()) {
+            for (auto &op: stage.getBody().front()) {
                 if (auto transition = dyn_cast<hec::TransitionOp>(op)) {
                     json sj;
                     sj["jump"] = json::array();
-                    for (auto &sop : transition.getBody().front()) {
+                    for (auto &sop: transition.getBody().front()) {
                         if (auto jump = dyn_cast<hec::GotoOp>(sop)) {
-                            if (jump.getCond()) {
+                            if (jump.getGuard()) {
                                 json ssj;
                                 ssj["dest"] = jump.getDest();
-                                ssj["cond"] = get_value(jump.getCond());
+                                ssj["cond"] = get_value(jump.getGuard());
                                 sj["jump"].push_back(ssj);
                             } else {
                                 sj["default"] = jump.getDest();
@@ -282,11 +304,11 @@ namespace {
             auto style = get_attr(component->getAttr("style"));
             j["style"] = style;
 
-            for (auto val : component.getArguments()) {
+            for (auto val: component.getArguments()) {
                 j["args"].push_back(get_value(val));
                 j["types"].push_back(get_type(val.getType()));
             }
-            for (auto val : component->getResults()) {
+            for (auto val: component->getResults()) {
                 j["return_vals"].push_back(get_value(val));
                 j["ret_types"].push_back(get_type(val.getType()));
             }
@@ -301,14 +323,14 @@ namespace {
             } else if (style == "handshake") {
                 j["graph"] = json::array();
                 j["sinks"] = json::array();
-                for (auto &op : component.getBody().front()) {
+                for (auto &op: component.getBody().front()) {
                     if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {
                         auto portInfo = primitive.getPrimitivePortInfo();
                         for (unsigned idx = 0; idx < portInfo.size(); ++idx) {
                             if (portInfo[idx].direction == hec::PortDirection::OUTPUT) {
                                 auto port = primitive.getResult(idx);
                                 int use_count = 0;
-                                for (auto &bval : port.getUses()) {
+                                for (auto &bval: port.getUses()) {
                                     if (auto assign = dyn_cast<hec::AssignOp>(bval.getOwner())) {
                                         if (assign.getSrc() == port) {
                                             ++use_count;
@@ -323,14 +345,17 @@ namespace {
                     }
                 }
             }
-            for (auto &op : component.getBody().front()) {
+            for (auto &op: component.getBody().front()) {
                 if (auto primitive = dyn_cast<hec::PrimitiveOp>(op)) {
                     json sj;
                     sj["types"] = json::array();
                     sj["op_type"] = primitive.getPrimitiveName();
                     sj["name"] = primitive.getInstanceName();
-                    for (auto val : primitive->getResults()) {
+                    for (auto val: primitive->getResults()) {
                         sj["types"].push_back(get_type(val.getType()));
+                    }
+                    if (primitive->hasAttr("latency")) {
+                        sj["latency"] = primitive->getAttr("latency").dyn_cast<mlir::IntegerAttr>().getInt();
                     }
                     j["units"].push_back(sj);
                 } else if (auto init = dyn_cast<hec::InitOp>(op)) {
@@ -343,7 +368,7 @@ namespace {
                     sj["name"] = wire.getName();
                     j["wires"] = sj;
                 } else if (auto states = dyn_cast<hec::StateSetOp>(op)) {
-                    for (auto &sop : states.getBody().front()) {
+                    for (auto &sop: states.getBody().front()) {
                         auto state = dyn_cast<hec::StateOp>(sop);
                         if (state.getInitial()) {
                             j["init_state"] = state.getName();
@@ -351,7 +376,7 @@ namespace {
                         j["states"].push_back(get_json(state));
                     }
                 } else if (auto stages = dyn_cast<hec::StageSetOp>(op)) {
-                    for (auto &sop : stages.getBody().front()) {
+                    for (auto &sop: stages.getBody().front()) {
                         auto stage = dyn_cast<hec::StageOp>(sop);
                         j["stages"].push_back(get_json(stage));
                     }
@@ -362,7 +387,7 @@ namespace {
                     sj["names"] = json::array();
                     j["instances"].push_back(sj);
                 } else if (auto graph = dyn_cast<hec::GraphOp>(op)) {
-                    for (auto &sop : graph.getBody().front()) {
+                    for (auto &sop: graph.getBody().front()) {
                         j["graph"].push_back(get_json(&sop));
                     }
                 } else {
@@ -378,10 +403,13 @@ namespace {
             json j;
             j["level"] = "hec";
             j["memory"] = json::array();
+            j["stream"] = json::array();
+            j["m_axi_bus"] = json::array();
             j["modules"] = json::array();
             j["constants"] = json::array();
-
-            for (auto &op : designOp.getBody().front()) {
+            j["units"] = json::array();
+            std::unordered_map<std::string, std::pair<int, int>> buses;
+            for (auto &op: designOp.getBody().front()) {
                 if (auto component = dyn_cast<hec::ComponentOp>(op)) {
                     j["modules"].push_back(get_json(component));
                 } else if (auto nop = dyn_cast<ConstantOp>(op)) {
@@ -401,14 +429,86 @@ namespace {
                             sj["type"] = get_type(primitive->getResult(2).getType());
                         }
                         sj["size"] = get_attr_num(primitive->getAttr("len"));
+                        if (primitive->hasAttr("value_h")) {
+                            sj["value_h"] = string(primitive->getAttr("value_h").dyn_cast<StringAttr>().getValue());
+                        }
                         j["memory"].push_back(sj);
+                    } else if (primitive.getPrimitiveName() == "m_axi") {
+                        json sj;
+                        sj["name"] = primitive.getInstanceName();
+                        auto attr = primitive->getAttrOfType<StringAttr>("type").getValue();
+                        if (attr == "rw") {
+                            sj["type"] = get_type(primitive->getResult(9).getType());
+                        } else if (attr == "w") {
+                            sj["type"] = get_type(primitive->getResult(6).getType());
+                        } else {
+                            sj["type"] = get_type(primitive->getResult(4).getType());
+                        }
+                        sj["size"] = get_attr_num(primitive->getAttr("len"));
+                        if (primitive->hasAttr("value_h")) {
+                            sj["value_h"] = string(primitive->getAttr("value_h").dyn_cast<StringAttr>().getValue());
+                        }
+                        // set bus name
+                        std::string bus = "";
+                        if (primitive->hasAttr("bus")) {
+                            bus = string(primitive->getAttr("bus").dyn_cast<StringAttr>().getValue());
+                        }
+                        sj["bus"] = bus;
+                        // set inital addr
+                        int initial_addr = 0;
+                        if (primitive->hasAttr("initial_addr")) {
+                            initial_addr = get_attr_num(primitive->getAttr("initial_addr"));
+                        }
+                        sj["initial_addr"] = initial_addr;
+                        // update burst length
+                        int max_read_burst_length = 256; // todo 设置过高debugger会oom，暂时设置256看看
+                        if (primitive->hasAttr("max_read_burst_length")) {
+                            max_read_burst_length = get_attr_num(primitive->getAttr("max_read_burst_length"));
+                        }
+                        int max_write_burst_length = 256;
+                        if (primitive->hasAttr("max_write_burst_length")) {
+                            max_write_burst_length = get_attr_num(primitive->getAttr("max_write_burst_length"));
+                        }
+
+                        if (buses.find(bus) != buses.end()) {
+                            buses[bus].first = std::min(buses[bus].first, max_read_burst_length);
+                            buses[bus].second = std::min(buses[bus].second, max_write_burst_length);
+                        } else {
+                            buses[bus] = {max_read_burst_length, max_write_burst_length};
+                        }
+                        j["memory"].push_back(sj);
+                    } else if (primitive.getPrimitiveName() == "fifo") {
+                        json sj;
+                        sj["name"] = primitive.getInstanceName();
+                        sj["depth"] = get_attr_num(primitive->getAttr("depth"));
+                        sj["type"] = get_type(primitive->getResult(2).getType());
+                        j["stream"].push_back(sj);
                     } else {
-                        assert(false);
+                        json sj;
+                        sj["types"] = json::array();
+                        sj["op_type"] = primitive.getPrimitiveName();
+                        sj["name"] = primitive.getInstanceName();
+                        for (auto val: primitive->getResults()) {
+                            sj["types"].push_back(get_type(val.getType()));
+                        }
+                        if (primitive->hasAttr("latency")) {
+                            sj["latency"] = primitive->getAttr("latency").dyn_cast<mlir::IntegerAttr>().getInt();
+                        }
+                        j["units"].push_back(sj);
+                        // assert(false);
                     }
                 } else {
                     op.dump();
 //                    assert(false);
                 }
+            }
+
+            for (auto bus: buses) {
+                json sj;
+                sj["name"] = bus.first;
+                sj["max_read_burst_length"] = bus.second.first;
+                sj["max_write_burst_length"] = bus.second.second;
+                j["m_axi_bus"].push_back(sj);
             }
             return j;
         }
@@ -416,10 +516,16 @@ namespace {
         struct HECDumpPass : HECDumpBase<HECDumpPass> {
             void runOnOperation() override {
                 auto designOp = getOperation();
+                auto json_file = (this->json).getValue();
 
+                // todo:所有hec内置算子需要在这里增加
                 designOp.walk([&](Operation *op) {
-                    if (isa<hec::ShiftLeftOp, hec::AddIOp, hec::SubIOp, hec::NotOp, hec::XOrOp, hec::AndOp,
-                            hec::OrOp, hec::CmpIOp, hec::TruncateIOp, hec::SelectOp>(op)) {
+                    if (isa<hec::ShiftLeftOp, hec::AddIOp, hec::SubIOp, hec::MulIConstOp,
+                            hec::NotOp, hec::XOrOp, hec::AndOp, hec::OrOp,
+                            hec::CmpIOp, hec::TruncateIOp, hec::SelectOp,
+                            hec::AbsFOp, hec::AbsIOp,
+                            hec::NegFOp, hec::SignExtendIOp, hec::ZeroExtendIOp, hec::ShiftLeftOp,
+                            hec::SignedShiftRightOp, hec::UnSignedShiftRightOp, hec::OrOp>(op)) {
                         op->setAttr("dump", StringAttr::get(&getContext(), get_comb_attr().c_str()));
                     }
                 });
@@ -432,8 +538,10 @@ namespace {
 
                 designOp.walk([&](hec::DesignOp op) {
                     auto j = get_json(op);
-                    std::ofstream output_file("hec.json");
-                    output_file << std::setw(2) << j << std::endl;
+                    if (json_file != "") {
+                        std::ofstream output_file(json_file);
+                        output_file << std::setw(2) << j << std::endl;
+                    }
                 });
             }
 

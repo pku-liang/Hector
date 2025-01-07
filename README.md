@@ -10,9 +10,12 @@ git checkout cbc378ecb87e3f31dd5aff91f2a621d500640412
 ```
 
 2. Clone the project
-   `git clone https://github.com/xuruifan/Hermes.git`
+   ```sh
+   git clone https://github.com/pku-liang/Hector.git
+   git checkout tutorial-aspdac
+   ```
 
-3. Get the submodules
+4. Get the submodules
 
 ```sh
 cd Hector

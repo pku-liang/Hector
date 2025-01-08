@@ -91,4 +91,14 @@ def HlsUnroll: Pass<"hls-unroll", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::tor::TORDialect"];
 }
 
+def RemoveRedundantAccess: Pass<"remove-access", "mlir::ModuleOp"> {
+  let summary = "Remove redundant access";
+  let constructor = "mlir::createRemoveRedundantAccessPass()";
+  let dependentDialects = ["mlir::tor::TORDialect"];
+  let options = [
+    Option<"mode", "mode", "std::string", "\"conservative\"",
+     "Opt mode, include none, conservative(default), aggressive">
+  ];
+}
+
 #endif // TOR_PASSES

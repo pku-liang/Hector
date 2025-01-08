@@ -28,6 +28,8 @@ namespace mlir {
 
     std::unique_ptr<OperationPass<mlir::ModuleOp>> createHlsUnrollPass();
 
+    std::unique_ptr<OperationPass<mlir::ModuleOp>> createRemoveRedundantAccessPass();
+
 #define GEN_PASS_REGISTRATION
 
 #include "TOR/Passes.h.inc"

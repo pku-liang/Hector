@@ -12,6 +12,7 @@ add_mlir_dialect_library(MLIRTOR
     ArrayPartition.cpp
     NewArrayPartition.cpp
     HlsUnroll.cpp
+    RemoveRedundantAccess.cpp
     
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TOR

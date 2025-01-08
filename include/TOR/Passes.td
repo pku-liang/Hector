@@ -3,6 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 include "mlir/Dialect/Func/IR/FuncOps.td"
+include "mlir/Dialect/MemRef/IR/MemRefOps.td"
 
 def TORSchedule : Pass<"schedule-tor", "mlir::tor::DesignOp"> {
   let summary = "Lower std+scf+affine to tor, schedule a time graph";
@@ -58,6 +59,12 @@ def ArrayPartition : Pass<"array-partition", "mlir::func::FuncOp"> {
     ListOption<"cyclic", "cyclic", "int", "Cyclic or block">,
     Option<"arg_num", "arg_num", "int", "0", "Parition argument number">
   ];
+}
+
+def NewArrayPartition : Pass<"new-array-partition", "mlir::ModuleOp"> {
+  let summary = "New Array partition";
+  let constructor = "mlir::createNewArrayPartitionPass()";
+  let dependentDialects = ["mlir::tor::TORDialect"];
 }
 
 def SCFDump : Pass<"dump-scf", "mlir::tor::DesignOp"> {

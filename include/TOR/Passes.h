@@ -24,7 +24,7 @@ namespace mlir {
 
     std::unique_ptr<OperationPass<mlir::func::FuncOp>> createArrayPartitionPass();
 
-    // std::unique_ptr<OperationPass<mlir::tor::DesignOp>> createWidthAnalysisPass();
+    std::unique_ptr<OperationPass<mlir::ModuleOp>> createNewArrayPartitionPass();
 
 #define GEN_PASS_REGISTRATION
 

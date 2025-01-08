@@ -10,6 +10,7 @@ add_mlir_dialect_library(MLIRTOR
     ConvertInput.cpp
     TORAttrs.cpp
     ArrayPartition.cpp
+    NewArrayPartition.cpp
     
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TOR

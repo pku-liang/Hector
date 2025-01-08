@@ -85,10 +85,10 @@ def TORDump : Pass<"dump-tor", "mlir::tor::DesignOp"> {
   ];
 }
 
-// def WidthAnalysis : Pass<"width-analysis", "mlir::tor::DesignOp"> {
-//   let summary = "bitwidth analysis and reduction";
-//   let constructor = "mlir::createWidthAnalysisPass()";
-//   let dependentDialects = ["mlir::tor::TORDialect"];
-// }
+def HlsUnroll: Pass<"hls-unroll", "mlir::ModuleOp"> {
+  let summary = "HLS loop unroll";
+  let constructor = "mlir::createHlsUnrollPass()";
+  let dependentDialects = ["mlir::tor::TORDialect"];
+}
 
 #endif // TOR_PASSES

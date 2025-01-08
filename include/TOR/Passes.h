@@ -26,6 +26,8 @@ namespace mlir {
 
     std::unique_ptr<OperationPass<mlir::ModuleOp>> createNewArrayPartitionPass();
 
+    std::unique_ptr<OperationPass<mlir::ModuleOp>> createHlsUnrollPass();
+
 #define GEN_PASS_REGISTRATION
 
 #include "TOR/Passes.h.inc"

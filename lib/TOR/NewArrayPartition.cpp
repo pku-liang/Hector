@@ -302,9 +302,9 @@ void createNewArray(Operation *op, SmallVector<Value> &newArray,
       funcOp.insertArgument(funcOp.getNumArguments(), newMemref, {},
                             funcOp.getLoc());
       newArray.push_back(funcOp.getArgument(funcOp.getNumArguments() - 1));
-    } else if (auto allocOp = dyn_cast<memref::AllocaOp>(op)) {
+    } else if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
       auto newAllocOp =
-          rewriter.create<memref::AllocaOp>(allocOp->getLoc(), newMemref);
+          rewriter.create<memref::AllocOp>(allocOp->getLoc(), newMemref);
       newArray.push_back(newAllocOp->getResult(0));
     } else if (auto globalOp = dyn_cast<memref::GlobalOp>(op)) {
       Attribute initValue = rewriter.getUnitAttr();
@@ -496,10 +496,10 @@ void partitionFunc(Operation *op, SmallVector<bool> partition,
                           partition, newArray);
 }
 
-struct AllocaOpPattern : OpRewritePattern<memref::AllocaOp> {
-  AllocaOpPattern(MLIRContext *ctx) : OpRewritePattern<memref::AllocaOp>(ctx) {}
+struct AllocOpPattern : OpRewritePattern<memref::AllocOp> {
+  AllocOpPattern(MLIRContext *ctx) : OpRewritePattern<memref::AllocOp>(ctx) {}
 
-  LogicalResult matchAndRewrite(memref::AllocaOp op,
+  LogicalResult matchAndRewrite(memref::AllocOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->hasAttr("array-partition") || !op->hasAttr("partition_dim_array"))
       return failure();
@@ -508,7 +508,7 @@ struct AllocaOpPattern : OpRewritePattern<memref::AllocaOp> {
     auto arg = op->getResult(0);
     auto memref = cast<MemRefType>(arg.getType());
     if (!checkValueUsers(arg, memref.getRank())) {
-      // warningNonStandardAffineAccess("alloca", op->getAttr("var_name"));
+      warningNonStandardAffineAccess("alloca", op->getAttr("var_name"));
       return failure();
     }
     DenseMap<int, int> factorMap;
@@ -1080,7 +1080,7 @@ void getIdValueMap(ModuleOp moduleOp,
       [&](FuncOp funcOp) { symNameFuncOpMap[funcOp.getSymName()] = funcOp; });
   // range is [0, groupCount)
   int groupCount = 0;
-  moduleOp.walk([&](memref::AllocaOp AI) {
+  moduleOp.walk([&](memref::AllocOp AI) {
     if (AI->hasAttr("partition_dim_array")) {
       auto arg = AI->getResult(0);
       idValueMap[groupCount] = DenseSet<Value>();
@@ -1145,10 +1145,10 @@ struct NewArrayPartitionPass : NewArrayPartitionBase<NewArrayPartitionPass> {
       func->removeAttr("array-partition");
     });
     SmallVector<Operation *> allocaOps;
-    moduleOp.walk([&](memref::AllocaOp AI) { allocaOps.push_back(AI); });
+    moduleOp.walk([&](memref::AllocOp AI) { allocaOps.push_back(AI); });
     for (auto op : allocaOps) {
       RewritePatternSet patterns(&getContext());
-      patterns.insert<AllocaOpPattern>(&getContext());
+      patterns.insert<AllocOpPattern>(&getContext());
       (void)applyOpPatternsAndFold(op, std::move(patterns));
     }
   }

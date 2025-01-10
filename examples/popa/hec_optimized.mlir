@@ -333,22 +333,6 @@ module @kernels {
     %mem_global_53.w_en, %mem_global_53.addr, %mem_global_53.w_data = hec.primitive "mem_global_53" is "mem" {len = 1 : i32, ports = "w"} : i1, i1, i32
     %mem_global_54.w_en, %mem_global_54.addr, %mem_global_54.w_data = hec.primitive "mem_global_54" is "mem" {len = 1 : i32, ports = "w"} : i1, i1, i32
     %mem_global_55.w_en, %mem_global_55.addr, %mem_global_55.w_data = hec.primitive "mem_global_55" is "mem" {len = 1 : i32, ports = "w"} : i1, i1, i32
-    %muli_0.operand0, %muli_0.operand1, %muli_0.result = hec.primitive "muli_0" is "mul_integer" : i32, i32, i32
-    %muli_1.operand0, %muli_1.operand1, %muli_1.result = hec.primitive "muli_1" is "mul_integer" : i32, i32, i32
-    %muli_2.operand0, %muli_2.operand1, %muli_2.result = hec.primitive "muli_2" is "mul_integer" : i32, i32, i32
-    %muli_3.operand0, %muli_3.operand1, %muli_3.result = hec.primitive "muli_3" is "mul_integer" : i32, i32, i32
-    %muli_4.operand0, %muli_4.operand1, %muli_4.result = hec.primitive "muli_4" is "mul_integer" : i32, i32, i32
-    %muli_5.operand0, %muli_5.operand1, %muli_5.result = hec.primitive "muli_5" is "mul_integer" : i32, i32, i32
-    %muli_6.operand0, %muli_6.operand1, %muli_6.result = hec.primitive "muli_6" is "mul_integer" : i32, i32, i32
-    %muli_7.operand0, %muli_7.operand1, %muli_7.result = hec.primitive "muli_7" is "mul_integer" : i32, i32, i32
-    %muli_8.operand0, %muli_8.operand1, %muli_8.result = hec.primitive "muli_8" is "mul_integer" : i32, i32, i32
-    %muli_9.operand0, %muli_9.operand1, %muli_9.result = hec.primitive "muli_9" is "mul_integer" : i32, i32, i32
-    %muli_10.operand0, %muli_10.operand1, %muli_10.result = hec.primitive "muli_10" is "mul_integer" : i32, i32, i32
-    %muli_11.operand0, %muli_11.operand1, %muli_11.result = hec.primitive "muli_11" is "mul_integer" : i32, i32, i32
-    %muli_12.operand0, %muli_12.operand1, %muli_12.result = hec.primitive "muli_12" is "mul_integer" : i32, i32, i32
-    %muli_13.operand0, %muli_13.operand1, %muli_13.result = hec.primitive "muli_13" is "mul_integer" : i32, i32, i32
-    %muli_14.operand0, %muli_14.operand1, %muli_14.result = hec.primitive "muli_14" is "mul_integer" : i32, i32, i32
-    %muli_15.operand0, %muli_15.operand1, %muli_15.result = hec.primitive "muli_15" is "mul_integer" : i32, i32, i32
     hec.component @outline_0(%arg0: i32,%arg1: i32,%arg2: i32,%arg3: i32,%arg4: i32,%arg5: i1) -> (%arg6: i1)
 		{interface="naked", style="pipeline"}{
       %r_0_1.reg = hec.primitive "r_0_1" is "register" : i32
@@ -512,6 +496,22 @@ module @kernels {
       %r_156_6.reg = hec.primitive "r_156_6" is "register" : i32
       %r_157_6.reg = hec.primitive "r_157_6" is "register" : i32
       %r_158_6.reg = hec.primitive "r_158_6" is "register" : i32
+      %muli_0.operand0, %muli_0.operand1, %muli_0.result = hec.primitive "muli_0" is "mul_integer" : i32, i32, i32
+      %muli_1.operand0, %muli_1.operand1, %muli_1.result = hec.primitive "muli_1" is "mul_integer" : i32, i32, i32
+      %muli_2.operand0, %muli_2.operand1, %muli_2.result = hec.primitive "muli_2" is "mul_integer" : i32, i32, i32
+      %muli_3.operand0, %muli_3.operand1, %muli_3.result = hec.primitive "muli_3" is "mul_integer" : i32, i32, i32
+      %muli_4.operand0, %muli_4.operand1, %muli_4.result = hec.primitive "muli_4" is "mul_integer" : i32, i32, i32
+      %muli_5.operand0, %muli_5.operand1, %muli_5.result = hec.primitive "muli_5" is "mul_integer" : i32, i32, i32
+      %muli_6.operand0, %muli_6.operand1, %muli_6.result = hec.primitive "muli_6" is "mul_integer" : i32, i32, i32
+      %muli_7.operand0, %muli_7.operand1, %muli_7.result = hec.primitive "muli_7" is "mul_integer" : i32, i32, i32
+      %muli_8.operand0, %muli_8.operand1, %muli_8.result = hec.primitive "muli_8" is "mul_integer" : i32, i32, i32
+      %muli_9.operand0, %muli_9.operand1, %muli_9.result = hec.primitive "muli_9" is "mul_integer" : i32, i32, i32
+      %muli_10.operand0, %muli_10.operand1, %muli_10.result = hec.primitive "muli_10" is "mul_integer" : i32, i32, i32
+      %muli_11.operand0, %muli_11.operand1, %muli_11.result = hec.primitive "muli_11" is "mul_integer" : i32, i32, i32
+      %muli_12.operand0, %muli_12.operand1, %muli_12.result = hec.primitive "muli_12" is "mul_integer" : i32, i32, i32
+      %muli_13.operand0, %muli_13.operand1, %muli_13.result = hec.primitive "muli_13" is "mul_integer" : i32, i32, i32
+      %muli_14.operand0, %muli_14.operand1, %muli_14.result = hec.primitive "muli_14" is "mul_integer" : i32, i32, i32
+      %muli_15.operand0, %muli_15.operand1, %muli_15.result = hec.primitive "muli_15" is "mul_integer" : i32, i32, i32
       %0 = hec.wire "i" : i32
       hec.init %r_0_1.reg = %arg0 : i32 -> i32
       hec.init %r_1_1.reg = %arg1 : i32 -> i32

@@ -71,7 +71,7 @@
 	],
 	"latency": 2,
 	"II": 1,
-	"constr": 1,
+	"constr": 0,
 	"amount": -1
     },
     "divi": {

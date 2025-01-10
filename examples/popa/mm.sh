@@ -1,0 +1,2 @@
+build/bin/hector-opt examples/popa/mm.mlir --canonicalize --hls-unroll --affine-loop-normalize --canonicalize --new-array-partition --canonicalize --remove-access=mode=aggressive --lower-affine --convert-input="top-function=_kernel_C_s0_run_on_device resource=./examples/resource_dynamatic.json" --dump-scf --scf-to-tor="pipeline" --schedule-tor --split-schedule --dump-tor="json=tor.json"
+~/Hestia/hestia/target/release/hestia tor.tcl
